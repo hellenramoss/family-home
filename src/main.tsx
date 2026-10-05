@@ -28,9 +28,11 @@ function App(){
  const active=useMemo(()=>lists.find(l=>l.id===activeId),[lists,activeId]);
  const updateActive=(fn:(l:FamilyList)=>FamilyList)=>setLists(ls=>ls.map(l=>l.id===activeId?fn(l):l));
 
- const openAdd=()=>{setNewItem('');setCategoryPicker(false);setItemCategory(localStorage.getItem('family-home-last-category')||'other');setAddOpen(true)};
- const closeAdd=()=>{setAddOpen(false);setCategoryPicker(false);setNewItem('')};
- const saveItem=()=>{const name=newItem.trim();if(!name)return;updateActive(l=>({...l,items:[...l.items,{id:uid(),name,done:false,category:itemCategory}]}));localStorage.setItem('family-home-last-category',itemCategory);closeAdd()};
+ const openAdd=()=>{setEditingItemId(null);setNewItem('');setItemQuantity('');setItemUnit('un');setItemNote('');setCategoryPicker(false);setItemCategory(localStorage.getItem('family-home-last-category')||'other');setAddOpen(true)};
+ const openEdit=(item:Item)=>{setEditingItemId(item.id);setNewItem(item.name);setItemQuantity(item.quantity||'');setItemUnit(item.unit||'un');setItemNote(item.note||'');setItemCategory(item.category||'other');setCategoryPicker(false);setAddOpen(true)};
+ const closeAdd=()=>{setAddOpen(false);setCategoryPicker(false);setEditingItemId(null);setNewItem('');setItemQuantity('');setItemNote('')};
+ const saveItem=()=>{const name=newItem.trim();if(!name)return;updateActive(l=>editingItemId?{...l,items:l.items.map(i=>i.id===editingItemId?{...i,name,category:itemCategory,quantity:itemQuantity.trim()||undefined,unit:itemQuantity.trim()?itemUnit:undefined,note:itemNote.trim()||undefined}:i)}:{...l,items:[...l.items,{id:uid(),name,done:false,category:itemCategory,quantity:itemQuantity.trim()||undefined,unit:itemQuantity.trim()?itemUnit:undefined,note:itemNote.trim()||undefined}]});localStorage.setItem('family-home-last-category',itemCategory);closeAdd()};
+ const deleteItem=()=>{if(!editingItemId)return;updateActive(l=>({...l,items:l.items.filter(i=>i.id!==editingItemId)}));closeAdd()};
  const chooseCategory=(id:string)=>{setItemCategory(id);localStorage.setItem('family-home-last-category',id);setCategoryPicker(false)};
  const createList=()=>{const name=listName.trim();if(!name)return;setLists(c=>[...c,{id:uid(),name:name.toUpperCase(),emoji:listEmoji.trim()||'✨',items:[]}]);setListName('');setListEmoji('✨');setNewList(false)};
 
