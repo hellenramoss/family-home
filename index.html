@@ -7,28 +7,29 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Family Home" />
-    <link rel="manifest" href="/family-home/manifest.webmanifest?v=60" />
-    <link rel="stylesheet" href="/family-home/history-cancel.css?v=60" />
-    <link rel="stylesheet" href="/family-home/price-insights.css?v=60" />
-    <link rel="stylesheet" href="/family-home/replenishment-v2.css?v=60" />
-    <link rel="stylesheet" href="/family-home/house-tasks.css?v=60" />
-    <link rel="stylesheet" href="/family-home/app-shell.css?v=60" />
+    <link rel="manifest" href="/family-home/manifest.webmanifest?v=63" />
+    <link rel="stylesheet" href="/family-home/history-cancel.css?v=63" />
+    <link rel="stylesheet" href="/family-home/price-insights.css?v=63" />
+    <link rel="stylesheet" href="/family-home/replenishment-v2.css?v=63" />
+    <link rel="stylesheet" href="/family-home/house-tasks.css?v=63" />
+    <link rel="stylesheet" href="/family-home/app-shell.css?v=63" />
     <title>Family Home</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script src="/family-home/history-cancel.js?v=60" defer></script>
-    <script src="/family-home/price-insights.js?v=60" defer></script>
-    <script src="/family-home/replenishment-v2.js?v=60" defer></script>
-    <script src="/family-home/house-tasks.js?v=60" defer></script>
-    <script src="/family-home/people-manager-hotfix.js?v=60" defer></script>
-    <script src="/family-home/app-shell.js?v=60" defer></script>
+    <script src="/family-home/history-cancel.js?v=63" defer></script>
+    <script src="/family-home/price-insights.js?v=63" defer></script>
+    <script src="/family-home/replenishment-v2.js?v=63" defer></script>
+    <script src="/family-home/house-tasks.js?v=63" defer></script>
+    <script src="/family-home/people-manager-hotfix.js?v=63" defer></script>
+    <script src="/family-home/dom-idempotency-hotfix.js?v=63" defer></script>
+    <script src="/family-home/app-shell.js?v=63" defer></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', async () => {
           try {
-            const registration = await navigator.serviceWorker.register('/family-home/sw.js?v=60', { updateViaCache: 'none' });
+            const registration = await navigator.serviceWorker.register('/family-home/sw.js?v=63', { updateViaCache: 'none' });
             await registration.update();
           } catch {}
         });
