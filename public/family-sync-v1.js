@@ -1,0 +1,1 @@
+(()=>{const c=window.FAMILY_HOME_SYNC_CONFIG||{};if(!c.url||!c.publishableKey||!window.supabase)return;window.familyHomeSupabase=window.supabase.createClient(c.url,c.publishableKey);window.dispatchEvent(new CustomEvent('family-home-sync-ready'));})();
