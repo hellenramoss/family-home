@@ -9,12 +9,14 @@
     <meta name="apple-mobile-web-app-title" content="Family Home" />
     <link rel="manifest" href="/family-home/manifest.webmanifest" />
     <link rel="stylesheet" href="/family-home/history-cancel.css" />
+    <link rel="stylesheet" href="/family-home/price-insights.css" />
     <title>Family Home</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script src="/family-home/history-cancel.js" defer></script>
+    <script src="/family-home/price-insights.js" defer></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => navigator.serviceWorker.register('/family-home/sw.js'));
