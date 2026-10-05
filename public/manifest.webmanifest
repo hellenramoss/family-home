@@ -1,0 +1,11 @@
+{
+  "name": "Family Home",
+  "short_name": "Family Home",
+  "description": "Listas e organização da família",
+  "start_url": "/family-home/",
+  "scope": "/family-home/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f8f8fa",
+  "lang": "pt-BR"
+}
