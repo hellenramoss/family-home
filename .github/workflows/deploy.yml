@@ -26,6 +26,11 @@ jobs:
           node-version: 22
       - name: Install
         run: npm install
+      - name: Validate browser scripts
+        run: |
+          for file in public/*.js; do
+            node --check "$file"
+          done
       - name: Build
         run: npm run build
       - name: Setup Pages
