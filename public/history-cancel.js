@@ -1,44 +1,34 @@
 (() => {
+  const closeHistoryEntry = scrim => {
+    scrim.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  };
+
   const enhanceHistoryForm = () => {
     const forms = document.querySelectorAll('.historyEntryForm');
+    document.body.classList.toggle('historyEntryActive', forms.length > 0);
+
     forms.forEach(form => {
-      if (form.querySelector('[data-history-cancel]')) return;
-
-      const title = form.querySelector('.pickerTitle');
       const scrim = form.closest('.pickerScrim');
-      if (!title || !scrim) return;
+      const title = form.querySelector('.pickerTitle');
+      if (!scrim || !title) return;
 
-      title.style.position = 'relative';
-      title.style.minHeight = '44px';
-      title.style.display = 'flex';
-      title.style.alignItems = 'center';
-      title.style.justifyContent = 'center';
+      scrim.classList.add('historyEntryScrim');
+      form.setAttribute('role', 'dialog');
+      form.setAttribute('aria-modal', 'true');
+      form.setAttribute('aria-label', 'Registrar compra anterior');
+
+      if (form.querySelector('[data-history-cancel]')) return;
 
       const cancel = document.createElement('button');
       cancel.type = 'button';
       cancel.setAttribute('data-history-cancel', 'true');
-      cancel.setAttribute('aria-label', 'Cancelar');
+      cancel.setAttribute('aria-label', 'Cancelar e fechar');
+      cancel.className = 'historyEntryCancel';
       cancel.textContent = '×';
-      Object.assign(cancel.style, {
-        position: 'absolute',
-        left: '0',
-        top: '50%',
-        transform: 'translateY(-50%)',
-        width: '44px',
-        height: '44px',
-        border: '0',
-        background: 'transparent',
-        color: '#4f86f7',
-        fontSize: '34px',
-        fontWeight: '300',
-        lineHeight: '1',
-        cursor: 'pointer'
-      });
-
       cancel.addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
-        scrim.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        closeHistoryEntry(scrim);
       });
 
       title.prepend(cancel);
