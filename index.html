@@ -6,10 +6,17 @@
     <meta name="theme-color" content="#f8f8fa" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Family Home" />
+    <link rel="manifest" href="/family-home/manifest.webmanifest" />
     <title>Family Home</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('/family-home/sw.js'));
+      }
+    </script>
   </body>
 </html>
