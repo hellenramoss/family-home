@@ -1,0 +1,14 @@
+(()=>{
+const LISTS='family-home-lists',BUDGET='fh-budget-v1',BATCHES='fh-market-batches-v1';
+const get=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},put=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const price=v=>{const s=String(v||'').trim();return Number(s.includes(',')?s.replace(/\./g,'').replace(',','.'):s)||0};
+const market=()=>get(LISTS,[]).find(l=>l.id==='market'||norm(l.name).includes('mercado'));
+let beforeIds=null;
+function captureStart(){const m=market();beforeIds=new Set((m?.purchaseHistory||[]).map(x=>x.id))}
+function captureEnd(){if(!beforeIds)return;const m=market(),fresh=(m?.purchaseHistory||[]).filter(x=>!beforeIds.has(x.id));beforeIds=null;if(!fresh.length)return;const batches=get(BATCHES,[]),id=`batch-${Date.now()}`,at=fresh[0].purchasedAt||new Date().toISOString();batches.push({id,purchasedAt:at,recordIds:fresh.map(x=>x.id)});put(BATCHES,batches);sync()}
+function inferredBatches(){const m=market(),known=get(BATCHES,[]),covered=new Set(known.flatMap(b=>b.recordIds||[])),groups=new Map();(m?.purchaseHistory||[]).filter(r=>!covered.has(r.id)).forEach(r=>{const k=r.purchasedAt||r.id;if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r.id)});return[...known,...[...groups].filter(([,ids])=>ids.length>1).map(([at,ids])=>({id:`legacy-${String(at).replace(/\W/g,'')}`,purchasedAt:at,recordIds:ids}))]}
+function sync(){const m=market();if(!m)return;const history=m.purchaseHistory||[],byId=new Map(history.map(r=>[r.id,r])),b=get(BUDGET,null);if(!b?.categories)return;let cat=b.categories.find(c=>c.id==='market')||b.categories.find(c=>norm(c.name)==='mercado');if(!cat)return;const batches=inferredBatches();let changed=false;batches.forEach(batch=>{const records=(batch.recordIds||[]).map(id=>byId.get(id)).filter(Boolean),total=records.reduce((s,r)=>s+price(r.price),0);if(!total)return;const existing=(b.transactions||[]).find(t=>t.sourceBatchId===batch.id);if(existing){if(existing.amount!==total){existing.amount=total;changed=true}return}const ids=new Set(batch.recordIds||[]);const old=(b.transactions||[]).filter(t=>t.source==='market'&&ids.has(t.sourcePurchaseId));if(old.length){b.transactions=b.transactions.filter(t=>!old.includes(t));changed=true}b.transactions.push({id:`market-${batch.id}`,categoryId:cat.id,amount:total,description:`Compra de mercado · ${records.length} ${records.length===1?'item':'itens'}`,date:String(batch.purchasedAt||'').slice(0,10),source:'market-batch',sourceBatchId:batch.id,sourcePurchaseIds:[...ids]});changed=true});if(changed)put(BUDGET,b)}
+document.addEventListener('click',e=>{const b=e.target.closest?.('.menu button');if(!b||!norm(b.textContent).includes('finalizar compra'))return;captureStart();setTimeout(captureEnd,300)},true);
+setInterval(sync,2800);window.addEventListener('focus',sync);setTimeout(sync,900);
+})();
