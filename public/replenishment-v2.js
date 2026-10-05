@@ -83,9 +83,10 @@
     return `em ${stat.daysUntil} dias`;
   };
 
-  const enhance = () => {
-    const sheet = document.querySelector('.insightsSheet');
-    if (!sheet) return;
+  const enhance = sheet => {
+    if (!sheet || sheet.dataset.replenishmentV2 === '1') return;
+    // Mark before touching the DOM so our own mutations cannot trigger another render pass.
+    sheet.dataset.replenishmentV2 = '1';
     const stats = buildStats();
     sheet.querySelectorAll('.insightRow').forEach(row => {
       const name = row.querySelector('.insightMain strong')?.textContent || '';
@@ -97,15 +98,11 @@
         const lastDate = new Date(stat.last.purchasedAt).toLocaleDateString('pt-BR');
         detail.textContent = `Costuma durar ~${stat.interval} dias · última compra ${lastDate}`;
       }
-      let confidence = main?.querySelector('.replenishmentConfidence');
-      if (!confidence && main) {
-        confidence = document.createElement('span');
-        confidence.className = 'replenishmentConfidence';
-        main.appendChild(confidence);
-      }
-      if (confidence) {
+      if (main) {
+        const confidence = document.createElement('span');
         confidence.className = `replenishmentConfidence ${stat.confidence || 'learning'}`;
         confidence.textContent = confidenceText(stat);
+        main.appendChild(confidence);
       }
       const status = row.querySelector('.insightStatus');
       if (status) {
@@ -117,7 +114,11 @@
     if (intro) intro.textContent = 'Usamos o intervalo mediano entre compras para evitar que uma compra fora do padrão distorça a previsão.';
   };
 
-  const observer = new MutationObserver(enhance);
+  const enhanceCurrentSheet = () => enhance(document.querySelector('.insightsSheet'));
+  const observer = new MutationObserver(mutations => {
+    if (!mutations.some(mutation => [...mutation.addedNodes].some(node => node.nodeType === 1 && (node.matches?.('.insightsSheet') || node.querySelector?.('.insightsSheet'))))) return;
+    requestAnimationFrame(enhanceCurrentSheet);
+  });
   observer.observe(document.documentElement, { childList: true, subtree: true });
-  enhance();
+  enhanceCurrentSheet();
 })();
