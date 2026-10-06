@@ -22,7 +22,8 @@ function App(){
  const[editingItemId,setEditingItemId]=useState<string|null>(null),[itemQuantity,setItemQuantity]=useState(''),[itemUnit,setItemUnit]=useState('un'),[itemNote,setItemNote]=useState(''),[itemPrice,setItemPrice]=useState('');
  const[categoryManager,setCategoryManager]=useState(false),[categoryEditor,setCategoryEditor]=useState(false),[editingCategoryId,setEditingCategoryId]=useState<string|null>(null),[categoryName,setCategoryName]=useState(''),[categoryEmoji,setCategoryEmoji]=useState('🏷️'),[historyOpen,setHistoryOpen]=useState(false),[insightsOpen,setInsightsOpen]=useState(false);
  const[historyEntryOpen,setHistoryEntryOpen]=useState(false),[historyName,setHistoryName]=useState(''),[historyDate,setHistoryDate]=useState(today()),[historyQuantity,setHistoryQuantity]=useState(''),[historyUnit,setHistoryUnit]=useState('un'),[historyPrice,setHistoryPrice]=useState(''),[historyCategory,setHistoryCategory]=useState('other');
- const cloudReady=useRef(false),applyingRemote=useRef(false),saveTimer=useRef<number|undefined>(undefined),ignoreRemoteUntil=useRef(0),swipeGesture=useRef<{id:string;x:number;y:number;startOffset:number;moved:boolean}|null>(null);\n const[swipedItemId,setSwipedItemId]=useState<string|null>(null),[swipeOffset,setSwipeOffset]=useState<{id:string;x:number}|null>(null);
+ const cloudReady=useRef(false),applyingRemote=useRef(false),saveTimer=useRef<number|undefined>(undefined),ignoreRemoteUntil=useRef(0),swipeGesture=useRef<{id:string;x:number;y:number;startOffset:number;moved:boolean}|null>(null);
+ const[swipedItemId,setSwipedItemId]=useState<string|null>(null),[swipeOffset,setSwipeOffset]=useState<{id:string;x:number}|null>(null);
  const normalizeLists=(incoming:FamilyList[])=>incoming.map(l=>l.id==='market'||l.name.toUpperCase().includes('MERCADO')?{...l,categories:l.categories?.length?l.categories:marketCategories,purchaseHistory:l.purchaseHistory||[]}:l);
  useEffect(()=>{
   let cancelled=false;
