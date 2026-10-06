@@ -1,0 +1,74 @@
+(()=>{
+const VERSION='familywall-lists-20261006-v1';
+const LOCAL_VERSION='fh-familywall-lists-import-v1';
+const TASKS={"house":[{"name":"Doação brinquedo escola Tonico","category":"Segunda","assignee":"Hellen e Karina"},{"name":"Antecipar Pgto FIV","category":"Terça","assignee":"Karina"},{"name":"Fazer app Déia Cakes ( controle de vendas e pgtos)","category":"Terça","assignee":"Hellen"},{"name":"Atualizar financeiro","category":"Terça","assignee":"Karina"},{"name":"Perguntar Dra se continua toda suplementação até a transferência ( igual)","category":"Quarta"},{"name":"Aspirar o carro","category":"Final de semana","assignee":"Hellen"},{"name":"Instalar quadro Theo","category":"Final de semana","assignee":"Hellen"},{"name":"Arrumar roteador escritório e quarto","category":"Final de semana","assignee":"Hellen"},{"name":"Regar plantas","category":"Final de semana","assignee":"Karina"},{"name":"Dar vermífugo para gatos e dogs","dueDate":"2026-09-16","dueTime":"20:36"},{"name":"Cortar unha bob","dueDate":"2026-10-16","dueTime":"14:56"},{"name":"Olimpíada de Literatura FAZER PROVA","dueDate":"2026-11-12","dueTime":"12:56"},{"name":"Imprimir Páginas Gato de botas literatura","dueDate":"2026-09-25","dueTime":"11:10"},{"name":"Comprar presente Casamento Carol","dueDate":"2026-10-03","dueTime":"21:12","assignee":"Karina"}],"finance":[{"name":"Ver se não teve mais cobrança no Santander","dueDate":"2026-10-04","dueTime":"19:42"},{"name":"Matrícula Alpha 1797","dueDate":"2026-11-01","dueTime":"20:34"},{"name":"Reserva Tonico","dueDate":"2026-10-09","dueTime":"18:45"},{"name":"Mensalidade Jiu jitsu Tonico 100 ( Adam PG 50) vence dia 15","dueDate":"2026-10-15","dueTime":"16:50"},{"name":"Cartão Nubank Família"},{"name":"Água","dueDate":"2026-10-15","dueTime":"18:45"}],"homeGoals":[{"name":"Pintar teto banheiro com coral renova tetos e banheiro","dueDate":"2026-09-12","dueTime":"23:10"},{"name":"Tampa fogo","dueDate":"2026-08-15","dueTime":"23:10"},{"name":"Passar massa corrida buracos teto área de churrasco e escritório","dueDate":"2026-12-01","dueTime":"00:00"},{"name":"Colocar campainha com câmera","dueDate":"2026-10-01","dueTime":"23:10"},{"name":"Pintar teto suíte e escritório","dueDate":"2026-11-01","dueTime":"23:15"},{"name":"Comprar travessas grandes","dueDate":"2026-10-01","dueTime":"23:10"},{"name":"Arrumar madeira porta armário banheiro","dueDate":"2026-12-01","dueTime":"23:15"},{"name":"Instalar ar condicionado no escritório e na sala","dueDate":"2026-11-01","dueTime":"23:10"},{"name":"Aspirador de pó robô"},{"name":"Mini horta no quintal ( corredor)","dueDate":"2026-12-01","dueTime":"23:15"},{"name":"Comprar mesa nova área de churrasco","dueDate":"2026-11-01","dueTime":"23:15"},{"name":"Comprar móvel modulado área churrasqueira"}],"carGoals":[{"name":"Alinhamento e balanceamento"},{"name":"Trocar pneu traseiro"},{"name":"Instalação Insulfilm"},{"name":"Conserto do sensor do painel"},{"name":"Suporte ganchos nicho poltronas"}]};
+const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const get=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch{return d}};
+const put=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+
+function ensureLocalMetadata(){
+  let cats=get('fh-house-cats-v1',[]);
+  const defaults=[
+    {id:'fw-mon',name:'Segunda',emoji:'🫠'},
+    {id:'fw-tue',name:'Terça',emoji:'🫨'},
+    {id:'fw-wed',name:'Quarta',emoji:'🥺'},
+    {id:'fw-thu',name:'Quinta',emoji:'🤓'},
+    {id:'fw-fri',name:'Sexta',emoji:'💃'},
+    {id:'fw-weekend',name:'Final de semana',emoji:'🤪'}
+  ];
+  if(!Array.isArray(cats))cats=[];
+  for(const d of defaults)if(!cats.some(c=>norm(c.name)===norm(d.name)))cats.push(d);
+  put('fh-house-cats-v1',cats);
+  const catId=name=>cats.find(c=>norm(c.name)===norm(name))?.id;
+  const meta=get('fh-house-meta-v1',{});
+  const all=[...TASKS.house,...TASKS.finance,...TASKS.homeGoals,...TASKS.carGoals];
+  for(const t of all){
+    const key=norm(t.name);
+    meta[key]={
+      ...(meta[key]||{}),
+      ...(t.assignee?{assignee:t.assignee}:{}),
+      ...(t.dueDate?{dueDate:t.dueDate}:{}),
+      ...(t.dueTime?{dueTime:t.dueTime}:{}),
+      ...(t.category&&catId(t.category)?{categoryId:catId(t.category)}:{})
+    };
+  }
+  put('fh-house-meta-v1',meta);
+  let people=get('fh-house-people-v1',[]);
+  if(!Array.isArray(people))people=[];
+  for(const p of ['Hellen','Karina','Antônio','Hellen e Karina'])if(!people.some(x=>norm(x)===norm(p)))people.push(p);
+  put('fh-house-people-v1',people);
+  localStorage.setItem(LOCAL_VERSION,VERSION);
+}
+function makeList(id,name,emoji,rows){
+  return {id,name,emoji,items:rows.map((t,i)=>({id:`${id}-fw-${i+1}`,name:t.name,done:false})),familyWallImportVersion:VERSION};
+}
+async function run(){
+  ensureLocalMetadata();
+  const cloud=window.familyHomeCloud;
+  if(!cloud?.loadLists||!cloud?.saveLists)return;
+  const lists=await cloud.loadLists();
+  if(!Array.isArray(lists))return;
+  const replacements=[
+    makeList('house','TAREFAS DA CASA','🌟🏠',TASKS.house),
+    makeList('finance','GESTÃO FINANCEIRA','💰',TASKS.finance),
+    makeList('goals-home-2026','OBJETIVOS 2026 CASA❤️','🏠❤️',TASKS.homeGoals),
+    makeList('goals-car-2026','OBJETIVOS 2026 PARA O CARRO','🚗',TASKS.carGoals)
+  ];
+  const currentVersion=lists.find(l=>l.id==='house')?.familyWallImportVersion;
+  if(currentVersion===VERSION){
+    try{localStorage.setItem('family-home-lists',JSON.stringify(lists))}catch{}
+    return;
+  }
+  const ids=new Set(replacements.map(x=>x.id));
+  const names=new Set(replacements.map(x=>norm(x.name)));
+  const kept=lists.filter(l=>!ids.has(l.id)&&!names.has(norm(l.name)));
+  const next=[...kept,...replacements];
+  const ok=await cloud.saveLists(next);
+  if(ok){
+    try{localStorage.setItem('family-home-lists',JSON.stringify(next))}catch{}
+    location.reload();
+  }
+}
+window.addEventListener('family-home-family-ready',()=>setTimeout(()=>{void run()},1700),{once:true});
+setTimeout(()=>{ensureLocalMetadata();if(window.familyHomeCloud?.currentMembership)void run()},2600);
+})();
