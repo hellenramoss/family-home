@@ -10,46 +10,23 @@ function input(ph,type='text'){return E('input',{placeholder:ph,type})}
 function button(text,fn,secondary=false){const x=E('button',{textContent:text,className:secondary?'secondary':''});x.onclick=fn;return x}
 function message(b,text){let m=b.querySelector('.fhSyncMsg');if(!m){m=E('div',{className:'fhSyncMsg'});b.append(m)}m.textContent=text}
 async function membership(){const {data:{user}}=await sb.auth.getUser();currentUser=user||null;if(!user)return null;const {data,error}=await sb.from('family_members').select('family_id,display_name,role').eq('user_id',user.id).limit(1).maybeSingle();if(error)console.error('Family Home membership:',error);return data}
-async function loadLists(){
- if(!currentMembership)return null;
- const {data,error}=await sb.from('family_documents').select('payload,updated_at,updated_by').eq('family_id',currentMembership.family_id).eq('doc_key','lists').maybeSingle();
- if(error){console.error('Family Home load:',error);return null}
- return data?.payload??null;
-}
-async function saveLists(payload){
- if(!currentMembership||!currentUser||!Array.isArray(payload))return false;
- const {error}=await sb.from('family_documents').upsert({family_id:currentMembership.family_id,doc_key:'lists',payload,updated_at:new Date().toISOString(),updated_by:currentUser.id},{onConflict:'family_id,doc_key'});
- if(error){console.error('Family Home save:',error);return false}
- return true;
+async function loadLists(){if(!currentMembership)return null;const {data,error}=await sb.from('family_documents').select('payload,updated_at,updated_by').eq('family_id',currentMembership.family_id).eq('doc_key','lists').maybeSingle();if(error){console.error('Family Home load:',error);return null}return data?.payload??null}
+async function saveLists(payload){if(!currentMembership||!currentUser||!Array.isArray(payload))return false;const {error}=await sb.from('family_documents').upsert({family_id:currentMembership.family_id,doc_key:'lists',payload,updated_at:new Date().toISOString(),updated_by:currentUser.id},{onConflict:'family_id,doc_key'});if(error){console.error('Family Home save:',error);return false}return true}
+async function enableNotifications(box){
+ if(!('Notification'in window)||!('serviceWorker'in navigator)){message(box,'Este navegador não oferece notificações push para este app.');return}
+ if(!window.matchMedia('(display-mode: standalone)').matches&&/iPhone|iPad|iPod/i.test(navigator.userAgent)){message(box,'No iPhone, primeiro adicione o Family Home à Home Screen e abra pelo ícone.');return}
+ const permission=await Notification.requestPermission();
+ if(permission!=='granted'){message(box,'As notificações não foram permitidas.');return}
+ const reg=await navigator.serviceWorker.ready;
+ await reg.showNotification('Family Home 🏠',{body:'Notificações ativadas neste celular.',tag:'family-home-ready',data:{url:'/family-home/'}});
+ localStorage.setItem('fh-notification-permission','granted');
+ message(box,'Pronto! Este celular já está autorizado para notificações.');
 }
 function emitCloud(payload){window.dispatchEvent(new CustomEvent('family-home-cloud-data',{detail:{payload}}))}
-function startRealtime(){
- if(channel){sb.removeChannel(channel);channel=null}
- if(!currentMembership)return;
- channel=sb.channel('family-home-lists-'+currentMembership.family_id)
-  .on('postgres_changes',{event:'*',schema:'public',table:'family_documents',filter:'family_id=eq.'+currentMembership.family_id},p=>{
-    const row=p.new||p.old;if(row?.doc_key==='lists'&&Array.isArray(p.new?.payload))emitCloud(p.new.payload);
-  }).subscribe();
-}
-const api={
- get currentMembership(){return currentMembership},
- loadLists,
- saveLists,
- async refresh(){currentMembership=await membership();if(currentMembership)startRealtime();return currentMembership}
-};
-window.familyHomeCloud=api;
-async function showHome(){
- const m=await membership();if(!m)return showFamilySetup();
- currentMembership=m;startRealtime();
- document.querySelector('.fhSyncModal')?.remove();document.querySelector('.fhSyncPill')?.remove();
- const p=E('button',{className:'fhSyncPill',textContent:'☁ sincronizado'});
- p.onclick=async()=>{const {data:f}=await sb.from('families').select('name,invite_code').eq('id',m.family_id).single();const[o,b]=modal(f?.name||'Família');b.append(E('p',{textContent:'Conectado como '+m.display_name}),E('p',{textContent:'Código de convite: '+(f?.invite_code||'')}),button('Fechar',()=>o.remove()),button('Sair',async()=>{if(channel)await sb.removeChannel(channel);await sb.auth.signOut();location.reload()},true))};
- document.body.append(p);
- window.dispatchEvent(new CustomEvent('family-home-family-ready',{detail:m}));
- const remote=await loadLists();if(Array.isArray(remote))emitCloud(remote);
-}
+function startRealtime(){if(channel){sb.removeChannel(channel);channel=null}if(!currentMembership)return;channel=sb.channel('family-home-lists-'+currentMembership.family_id).on('postgres_changes',{event:'*',schema:'public',table:'family_documents',filter:'family_id=eq.'+currentMembership.family_id},p=>{const row=p.new||p.old;if(row?.doc_key==='lists'&&Array.isArray(p.new?.payload))emitCloud(p.new.payload)}).subscribe()}
+const api={get currentMembership(){return currentMembership},loadLists,saveLists,async refresh(){currentMembership=await membership();if(currentMembership)startRealtime();return currentMembership}};window.familyHomeCloud=api;
+async function showHome(){const m=await membership();if(!m)return showFamilySetup();currentMembership=m;startRealtime();document.querySelector('.fhSyncModal')?.remove();document.querySelector('.fhSyncPill')?.remove();const p=E('button',{className:'fhSyncPill',textContent:'☁ sincronizado'});p.onclick=async()=>{const {data:f}=await sb.from('families').select('name,invite_code').eq('id',m.family_id).single();const[o,b]=modal(f?.name||'Família');const notificationText=('Notification'in window&&Notification.permission==='granted')?'🔔 Notificações ativadas':'🔔 Ativar notificações';b.append(E('p',{textContent:'Conectado como '+m.display_name}),E('p',{textContent:'Código de convite: '+(f?.invite_code||'')}),button(notificationText,()=>enableNotifications(b)),button('Fechar',()=>o.remove()),button('Sair',async()=>{if(channel)await sb.removeChannel(channel);await sb.auth.signOut();location.reload()},true))};document.body.append(p);window.dispatchEvent(new CustomEvent('family-home-family-ready',{detail:m}));const remote=await loadLists();if(Array.isArray(remote))emitCloud(remote)}
 function showFamilySetup(){const[o,b]=modal('Configurar família');b.append(E('p',{textContent:'Crie sua casa neste celular ou entre em uma família existente.'}));const name=input('Seu nome');name.value='Hellen';const family=input('Nome da família');family.value='Ramos';const code=input('Código de convite');b.append(name,family,button('Criar família',async()=>{const {data,error}=await sb.rpc('create_family',{p_name:family.value.trim()||'Ramos',p_display_name:name.value.trim()||'Hellen'});if(error)return message(b,error.message);message(b,'Família criada. Código: '+data?.[0]?.invite_code);setTimeout(showHome,900)}),code,button('Entrar com código',async()=>{const {error}=await sb.rpc('join_family',{p_invite_code:code.value.trim(),p_display_name:name.value.trim()||'Membro'});if(error)return message(b,error.message);showHome()},true))}
 function showAuth(){const[o,b]=modal('Family Home');b.append(E('p',{textContent:'Entre para sincronizar a casa entre os celulares.'}));const email=input('E-mail','email'),pass=input('Senha','password');b.append(email,pass,button('Entrar',async()=>{const {error}=await sb.auth.signInWithPassword({email:email.value.trim(),password:pass.value});if(error)return message(b,error.message);o.remove();showHome()}),button('Criar conta',async()=>{const {error}=await sb.auth.signUp({email:email.value.trim(),password:pass.value});if(error)return message(b,error.message);message(b,'Conta criada. Se receber um e-mail de confirmação, confirme e depois entre.')},true))}
-sb.auth.getSession().then(({data})=>data.session?showHome():showAuth());
-sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session)setTimeout(showHome,0);if(event==='SIGNED_OUT'){currentMembership=null;currentUser=null}});
+sb.auth.getSession().then(({data})=>data.session?showHome():showAuth());sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session)setTimeout(showHome,0);if(event==='SIGNED_OUT'){currentMembership=null;currentUser=null}});
 })();
