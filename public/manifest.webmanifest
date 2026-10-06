@@ -1,11 +1,16 @@
 {
+  "id": "/family-home/",
   "name": "Family Home",
   "short_name": "Family Home",
   "description": "Listas e organização da família",
   "start_url": "/family-home/",
   "scope": "/family-home/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#ffffff",
   "theme_color": "#f8f8fa",
-  "lang": "pt-BR"
+  "lang": "pt-BR",
+  "icons": [
+    {"src":"/family-home/family-home-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
 }
