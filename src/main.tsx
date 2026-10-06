@@ -1,4 +1,4 @@
-import React,{useEffect,useMemo,useState}from'react';
+import React,{useEffect,useMemo,useRef,useState}from'react';
 import{createRoot}from'react-dom/client';
 import{Check,ChevronDown,ChevronLeft,ChevronUp,Clock3,Eye,EyeOff,MoreHorizontal,Pencil,Plus,RotateCcw,ShoppingCart,Sparkles,Trash2,X}from'lucide-react';
 import'./styles.css';
@@ -22,7 +22,20 @@ function App(){
  const[editingItemId,setEditingItemId]=useState<string|null>(null),[itemQuantity,setItemQuantity]=useState(''),[itemUnit,setItemUnit]=useState('un'),[itemNote,setItemNote]=useState(''),[itemPrice,setItemPrice]=useState('');
  const[categoryManager,setCategoryManager]=useState(false),[categoryEditor,setCategoryEditor]=useState(false),[editingCategoryId,setEditingCategoryId]=useState<string|null>(null),[categoryName,setCategoryName]=useState(''),[categoryEmoji,setCategoryEmoji]=useState('🏷️'),[historyOpen,setHistoryOpen]=useState(false),[insightsOpen,setInsightsOpen]=useState(false);
  const[historyEntryOpen,setHistoryEntryOpen]=useState(false),[historyName,setHistoryName]=useState(''),[historyDate,setHistoryDate]=useState(today()),[historyQuantity,setHistoryQuantity]=useState(''),[historyUnit,setHistoryUnit]=useState('un'),[historyPrice,setHistoryPrice]=useState(''),[historyCategory,setHistoryCategory]=useState('other');
- useEffect(()=>{try{localStorage.setItem('family-home-lists',JSON.stringify(lists))}catch{}},[lists]);
+ const cloudReady=useRef(false),applyingRemote=useRef(false),saveTimer=useRef<number|undefined>(undefined);
+ const normalizeLists=(incoming:FamilyList[])=>incoming.map(l=>l.id==='market'||l.name.toUpperCase().includes('MERCADO')?{...l,categories:l.categories?.length?l.categories:marketCategories,purchaseHistory:l.purchaseHistory||[]}:l);
+ useEffect(()=>{
+  let cancelled=false;
+  const applyRemote=(payload:unknown)=>{if(cancelled||!Array.isArray(payload))return;applyingRemote.current=true;setLists(normalizeLists(payload as FamilyList[]));window.setTimeout(()=>{applyingRemote.current=false},0)};
+  const connect=async()=>{const cloud=(window as any).familyHomeCloud;if(!cloud?.currentMembership)return;cloudReady.current=true;const remote=await cloud.loadLists?.();if(Array.isArray(remote)&&remote.length)applyRemote(remote);else await cloud.saveLists?.(lists)};
+  const onReady=()=>{void connect()};
+  const onData=(e:Event)=>applyRemote((e as CustomEvent).detail?.payload);
+  window.addEventListener('family-home-family-ready',onReady);
+  window.addEventListener('family-home-cloud-data',onData);
+  void connect();
+  return()=>{cancelled=true;window.removeEventListener('family-home-family-ready',onReady);window.removeEventListener('family-home-cloud-data',onData)};
+ },[]);
+ useEffect(()=>{try{localStorage.setItem('family-home-lists',JSON.stringify(lists))}catch{}if(!cloudReady.current||applyingRemote.current)return;if(saveTimer.current)window.clearTimeout(saveTimer.current);saveTimer.current=window.setTimeout(()=>{void (window as any).familyHomeCloud?.saveLists?.(lists)},350);return()=>{if(saveTimer.current)window.clearTimeout(saveTimer.current)}},[lists]);
  const active=useMemo(()=>lists.find(l=>l.id===activeId),[lists,activeId]);
  const updateActive=(fn:(l:FamilyList)=>FamilyList)=>setLists(ls=>ls.map(l=>l.id===activeId?fn(l):l));
  const resetEditor=()=>{setEditingItemId(null);setNewItem('');setItemQuantity('');setItemUnit('un');setItemNote('');setItemPrice('');setCategoryPicker(false)};
