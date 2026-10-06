@@ -7,44 +7,45 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Family Home" />
-    <link rel="manifest" href="/family-home/manifest.webmanifest?v=77" />
-    <link rel="stylesheet" href="/family-home/history-cancel.css?v=77" />
-    <link rel="stylesheet" href="/family-home/price-insights.css?v=77" />
-    <link rel="stylesheet" href="/family-home/replenishment-v2.css?v=77" />
-    <link rel="stylesheet" href="/family-home/house-tasks.css?v=77" />
-    <link rel="stylesheet" href="/family-home/app-shell.css?v=77" />
-    <link rel="stylesheet" href="/family-home/family-experience-v2.css?v=77" />
-    <link rel="stylesheet" href="/family-home/calendar-task-sync.css?v=77" />
-    <link rel="stylesheet" href="/family-home/task-recurrence-reminders.css?v=77" />
-    <link rel="stylesheet" href="/family-home/experience-v3.css?v=77" />
+    <link rel="manifest" href="/family-home/manifest.webmanifest?v=78" />
+    <link rel="stylesheet" href="/family-home/history-cancel.css?v=78" />
+    <link rel="stylesheet" href="/family-home/price-insights.css?v=78" />
+    <link rel="stylesheet" href="/family-home/replenishment-v2.css?v=78" />
+    <link rel="stylesheet" href="/family-home/house-tasks.css?v=78" />
+    <link rel="stylesheet" href="/family-home/app-shell.css?v=78" />
+    <link rel="stylesheet" href="/family-home/family-experience-v2.css?v=78" />
+    <link rel="stylesheet" href="/family-home/calendar-task-sync.css?v=78" />
+    <link rel="stylesheet" href="/family-home/task-recurrence-reminders.css?v=78" />
+    <link rel="stylesheet" href="/family-home/experience-v3.css?v=78" />
     <title>Family Home</title>
   </head>
   <body>
     <div id="root"></div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
-    <script src="/family-home/sync-config.js?v=77"></script>
-    <script src="/family-home/family-sync-v1.js?v=77"></script>
-    <script src="/family-home/familywall-import-v1.js?v=77"></script>
-    <script src="/family-home/task-recurrence-reminders.js?v=77"></script>
+    <script src="/family-home/sync-config.js?v=78"></script>
+    <script src="/family-home/family-sync-v1.js?v=78"></script>
+    <script src="/family-home/familywall-import-v1.js?v=78"></script>
+    <script src="/family-home/familywall-lists-import-v1.js?v=78"></script>
+    <script src="/family-home/task-recurrence-reminders.js?v=78"></script>
     <script type="module" src="/src/main.tsx"></script>
-    <script src="/family-home/history-cancel.js?v=77" defer></script>
-    <script src="/family-home/price-insights.js?v=77" defer></script>
-    <script src="/family-home/replenishment-v2.js?v=77" defer></script>
-    <script src="/family-home/house-tasks.js?v=77" defer></script>
-    <script src="/family-home/people-manager-hotfix.js?v=77" defer></script>
-    <script src="/family-home/dom-idempotency-hotfix.js?v=77" defer></script>
-    <script src="/family-home/app-shell.js?v=77" defer></script>
-    <script src="/family-home/family-experience-v2.js?v=77" defer></script>
-    <script src="/family-home/calendar-task-sync.js?v=77" defer></script>
-    <script src="/family-home/currency-brl-v1.js?v=77" defer></script>
-    <script src="/family-home/budget-experience-v3.js?v=77" defer></script>
-    <script src="/family-home/calendar-experience-v2.js?v=77" defer></script>
-    <script src="/family-home/market-drag-v1.js?v=77" defer></script>
+    <script src="/family-home/history-cancel.js?v=78" defer></script>
+    <script src="/family-home/price-insights.js?v=78" defer></script>
+    <script src="/family-home/replenishment-v2.js?v=78" defer></script>
+    <script src="/family-home/house-tasks.js?v=78" defer></script>
+    <script src="/family-home/people-manager-hotfix.js?v=78" defer></script>
+    <script src="/family-home/dom-idempotency-hotfix.js?v=78" defer></script>
+    <script src="/family-home/app-shell.js?v=78" defer></script>
+    <script src="/family-home/family-experience-v2.js?v=78" defer></script>
+    <script src="/family-home/calendar-task-sync.js?v=78" defer></script>
+    <script src="/family-home/currency-brl-v1.js?v=78" defer></script>
+    <script src="/family-home/budget-experience-v3.js?v=78" defer></script>
+    <script src="/family-home/calendar-experience-v2.js?v=78" defer></script>
+    <script src="/family-home/market-drag-v1.js?v=78" defer></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', async () => {
           try {
-            const registration = await navigator.serviceWorker.register('/family-home/sw.js?v=77', { updateViaCache: 'none' });
+            const registration = await navigator.serviceWorker.register('/family-home/sw.js?v=78', { updateViaCache: 'none' });
             await registration.update();
           } catch {}
         });
