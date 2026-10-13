@@ -54,14 +54,14 @@ function App(){
   return()=>window.removeEventListener('family-home-receipt-import',onReceipt);
  },[]);
  const resetEditor=()=>{setEditingItemId(null);setNewItem('');setItemQuantity('');setItemUnit('un');setItemNote('');setItemPrice('');setCategoryPicker(false)};
- const openAdd=()=>{resetEditor();setItemCategory('other');try{const k='fh-house-meta-v1',v=JSON.parse(localStorage.getItem(k)||'{}');delete v.__draft__;localStorage.setItem(k,JSON.stringify(v))}catch{}setAddOpen(true)};
+ const openAdd=()=>{resetEditor();setItemCategory('other');try{const k='fh-house-meta-v1',v=JSON.parse(localStorage.getItem(k)||'{}');delete v.draft;localStorage.setItem(k,JSON.stringify(v))}catch{}setAddOpen(true)};
  const openEdit=(item:Item)=>{setEditingItemId(item.id);setNewItem(item.name);setItemQuantity(item.quantity||'');setItemUnit(item.unit||'un');setItemNote(item.note||'');setItemPrice(item.price||'');setItemCategory(item.category||'other');setCategoryPicker(false);setAddOpen(true)};
  const closeAdd=()=>{setAddOpen(false);resetEditor()};
  const saveItem=()=>{const name=newItem.trim();if(!name)return;
  if(active?.id==='house'||/TAREFAS DA CASA/i.test(active?.name||'')){
   try{
    const key=(value:string)=>normalize(value);
-   const metaKey='fh-house-meta-v1',pendingKey='__draft__';
+   const metaKey='fh-house-meta-v1',pendingKey='draft';
    const all=JSON.parse(localStorage.getItem(metaKey)||'{}');
    const previous=editingItemId?active?.items.find(i=>i.id===editingItemId)?.name:'';
    if(previous&&key(previous)!==key(name)&&all[key(previous)]){all[key(name)]={...all[key(previous)]};delete all[key(previous)];}
