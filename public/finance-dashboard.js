@@ -45,5 +45,6 @@ function details(kind,cat){const list=active.filter(x=>x.direction===kind&&(!cat
 body.querySelectorAll('[data-kind]').forEach(x=>x.onclick=()=>details(x.dataset.kind));body.querySelectorAll('[data-cat]').forEach(x=>x.onclick=()=>details('expense',x.dataset.cat));
 body.querySelector('[data-open="ledger"]').onclick=()=>document.querySelector('[data-ledger]')?.click();body.querySelector('[data-open="users"]').onclick=()=>document.querySelector('[data-finance-users]')?.click();
 }
+window.addEventListener('finance-data-changed',()=>{const panel=document.querySelector('.financeDashboard');if(panel)load(panel)});
 let queued=false;new MutationObserver(()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;attach()})}).observe(document.documentElement,{childList:true,subtree:true});attach();
 })();
