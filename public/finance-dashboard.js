@@ -1,5 +1,5 @@
 (()=>{
-const $=s=>document.querySelector(s),money=n=>Number(n).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $=s=>document.querySelector(s),money=n=>(Math.ceil((Number(n) * 100) - 0.00000001) / 100).toLocaleString('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:2,maximumFractionDigits:2}),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let month=new Date().toLocaleDateString('sv-SE').slice(0,7),scope='family',counter=0,showOld=false;
 function attach(){
 const hero=$('.fhBudgetHero');if(!hero||$('.financeDashboard'))return;
