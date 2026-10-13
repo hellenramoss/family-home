@@ -1,5 +1,5 @@
 (()=>{
-const money=n=>Number(n).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const money=n=>(Math.ceil(Number(n)*100 - 1e-8)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function open(){
 const shade=document.createElement('div');shade.className='financeCardShade';
