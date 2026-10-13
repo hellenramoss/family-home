@@ -20,13 +20,14 @@
       if(token!==sequence||!section.isConnected)return;
       if(rows.error)throw rows.error;
       if(!rows.data?.length){section.innerHTML='';return}
+      section.dataset.updatedFor=ym;
       section.innerHTML='<h3>Contribuição equitativa</h3><p>Divisão proporcional às entradas, conforme a fórmula do Excel.</p>'+rows.data.map(x=>'<div class="fdSplitRow"><strong>'+escapeHtml(x.person_name)+'</strong><span>Contribuição <b>'+money(x.contribution)+'</b><small>Saldo após contribuição: '+money(x.remaining)+'</small></span></div>').join('');
     }catch(error){if(token===sequence&&section.isConnected)section.innerHTML='<p>Rateio indisponível: '+escapeHtml(error.message)+'</p>'}
   }
   let pending=false;
   const observer=new MutationObserver(()=>{
     if(pending)return;pending=true;
-    requestAnimationFrame(()=>{pending=false;const panel=document.querySelector('.financeDashboard');if(panel&&panel.querySelector('.fdBody .fdHero'))void update(panel)});
+    requestAnimationFrame(()=>{pending=false;const panel=document.querySelector('.financeDashboard');if(panel&&panel.querySelector('.fdBody .fdHero')&&panel.querySelector('.fdSplit')?.dataset.updatedFor!==panel.querySelector('.fdMonth')?.value)void update(panel)});
   });
   observer.observe(document.documentElement,{childList:true,subtree:true});
 })();
