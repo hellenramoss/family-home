@@ -1,5 +1,5 @@
 (() => {
-  const money = value => Number(value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  const money = value => (Math.ceil(Number(value)*100 - 1e-8)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
   const escapeHtml = text => String(text??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let sequence=0;
   async function update(panel){
