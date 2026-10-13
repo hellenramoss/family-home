@@ -55,21 +55,24 @@
         return;
       }
       const rawMedian = median(gaps);
-      const interval = Math.max(1, Math.round(rawMedian));
+      const recentGap = gaps[gaps.length - 1];
+      const recentChange = gaps.length >= 2 && recentGap < rawMedian * 0.6;
+      const interval = Math.max(1, Math.round(recentChange ? recentGap : rawMedian));
       const deviations = gaps.map(value => Math.abs(value - rawMedian));
       const relativeVariation = rawMedian > 0 ? median(deviations) / rawMedian : 1;
       let confidence = 'low';
-      if (unique.length >= 5 && relativeVariation <= 0.25) confidence = 'high';
-      else if (unique.length >= 3 && relativeVariation <= 0.5) confidence = 'medium';
+      if (!recentChange && unique.length >= 5 && relativeVariation <= 0.25) confidence = 'high';
+      else if (!recentChange && unique.length >= 3 && relativeVariation <= 0.5) confidence = 'medium';
       const nextDate = new Date(new Date(last.purchasedAt).getTime() + interval * DAY);
       const daysUntil = Math.ceil((nextDate.getTime() - Date.now()) / DAY);
-      stats.set(key, { count: unique.length, last, interval, daysUntil, confidence, gaps });
+      stats.set(key, { count: unique.length, last, interval, daysUntil, confidence, gaps, recentChange });
     });
     return stats;
   };
 
   const confidenceText = stat => {
     if (!stat.interval) return `aprendendo · ${stat.count}/2 compras`;
+    if (stat.recentChange) return 'ritmo recente · estimativa provisória';
     if (stat.confidence === 'high') return 'previsão confiável';
     if (stat.confidence === 'medium') return 'confiança média';
     return stat.count <= 2 ? 'primeira estimativa' : 'padrão variável';
@@ -111,7 +114,7 @@
       }
     });
     const intro = sheet.querySelector('.insightsIntro small');
-    if (intro) intro.textContent = 'Usamos o intervalo mediano entre compras para evitar que uma compra fora do padrão distorça a previsão.';
+    if (intro) intro.textContent = 'Consideramos o ritmo recente quando a frequência muda. A estimativa não garante que o produto acabou.';
   };
 
   const enhanceCurrentSheet = () => enhance(document.querySelector('.insightsSheet'));
