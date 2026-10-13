@@ -89,6 +89,11 @@
     const itemsMatch=flat.match(/Qtd\. total de itens:\s*(\d+)/i);
     const paidMatch=flat.match(/Valor a pagar R\$:\s*([\d.,]+)/i);
     if(!dateMatch||!docMatch||!totalMatch) throw Error('Não encontrei os dados completos da NFC-e. Use o PDF da consulta da Secretaria da Fazenda.');
+    const purchasedAt=`${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}T${dateMatch[4]}-03:00`;
+    const receiptKey=keyMatch?.[0] || `${docMatch[1]}-${docMatch[2]}-${dateMatch[1]}${dateMatch[2]}${dateMatch[3]}`;
+    const previous=existingMarket()?.purchaseHistory||[];
+    if(previous.some(x=>x.receiptKey===receiptKey||x.source===`NFC-e ${receiptKey}`||x.purchasedAt===purchasedAt))
+      throw Error('Esta nota fiscal já foi importada. Os produtos dessa compra já estão no histórico.');
     const entries=[];
     for(const parts of pages) {
       const desc=parts.filter(x=>x.x<410 && /\(C[oó]digo:\s*\d+\s*\)/i.test(x.text));
@@ -112,8 +117,6 @@
     const gross=entries.reduce((a,x)=>a+Math.round(x.total*100),0)/100;
     if(Math.abs(gross-number(totalMatch[1]))>0.02)
       throw Error('A soma dos produtos não corresponde ao total fiscal. Nenhum registro foi salvo.');
-    const purchasedAt=`${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}T${dateMatch[4]}-03:00`;
-    const receiptKey=keyMatch?.[0] || `${docMatch[1]}-${docMatch[2]}-${dateMatch[1]}${dateMatch[2]}${dateMatch[3]}`;
     return {entries,purchasedAt,receiptKey,gross,paid:paidMatch?number(paidMatch[1]):null,store:flat.includes('SENDAS DISTRIBUIDORA')?'Assaí':'Supermercado'};
   }
   function existingMarket(){
