@@ -1,4 +1,4 @@
-const CACHE='family-home-v3';
+const CACHE='family-home-v4';
 const APP='/family-home/';
 
 self.addEventListener('install',event=>{
