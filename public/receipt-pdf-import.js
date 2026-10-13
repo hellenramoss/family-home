@@ -86,8 +86,9 @@
     const keyMatch=flat.replace(/\D/g,'').match(/3526\d{40}/);
     const docMatch=flat.match(/N[uú]mero:\s*(\d+)\s+S[eé]rie:\s*(\d+)/i);
     const totalMatch=flat.match(/Valor total R\$:\s*([\d.,]+)/i);
+    const itemsMatch=flat.match(/Qtd\. total de itens:\s*(\d+)/i);
     const paidMatch=flat.match(/Valor a pagar R\$:\s*([\d.,]+)/i);
-    if(!dateMatch||!docMatch) throw Error('Não encontrei a data ou número da NFC-e. Use o PDF da consulta da Secretaria da Fazenda.');
+    if(!dateMatch||!docMatch||!totalMatch) throw Error('Não encontrei os dados completos da NFC-e. Use o PDF da consulta da Secretaria da Fazenda.');
     const entries=[];
     for(const parts of pages) {
       const desc=parts.filter(x=>x.x<410 && /\(C[oó]digo:\s*\d+\s*\)/i.test(x.text));
@@ -107,8 +108,9 @@
       }
     }
     if(!entries.length) throw Error('Não consegui identificar os produtos. PDFs digitalizados como imagem ainda não são aceitos.');
+    if(!itemsMatch || entries.length !== Number(itemsMatch[1])) throw Error('A quantidade de itens não corresponde à nota fiscal. Nenhum registro foi salvo.');
     const gross=entries.reduce((a,x)=>a+Math.round(x.total*100),0)/100;
-    if(totalMatch && Math.abs(gross-number(totalMatch[1]))>0.02)
+    if(Math.abs(gross-number(totalMatch[1]))>0.02)
       throw Error('A soma dos produtos não corresponde ao total fiscal. Nenhum registro foi salvo.');
     const purchasedAt=`${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}T${dateMatch[4]}-03:00`;
     const receiptKey=keyMatch?.[0] || `${docMatch[1]}-${docMatch[2]}-${dateMatch[1]}${dateMatch[2]}${dateMatch[3]}`;
@@ -132,7 +134,7 @@
         const market=existingMarket();
         if(!market) throw Error('Abra a Lista de Compras e aguarde a sincronização antes de importar.');
         const history=market.purchaseHistory||[];
-        if(history.some(x=>x.receiptKey===receipt.receiptKey||x.source===`NFC-e ${receipt.receiptKey}`))
+        if(history.some(x=>x.receiptKey===receipt.receiptKey||x.source===`NFC-e ${receipt.receiptKey}`||x.purchasedAt===receipt.purchasedAt))
           throw Error('Essa nota fiscal já está no histórico.');
         const grouped=new Map();
         receipt.entries.forEach((r,i)=>{
