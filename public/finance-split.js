@@ -21,7 +21,7 @@
       if(rows.error)throw rows.error;
       if(!rows.data?.length){section.innerHTML='';return}
       section.dataset.updatedFor=ym;
-      section.innerHTML='<h3>Contribuição equitativa</h3><p>Divisão proporcional às entradas, conforme a fórmula do Excel.</p>'+rows.data.map(x=>'<div class="fdSplitRow"><strong>'+escapeHtml(x.person_name)+'</strong><span>Contribuição <b>'+money(x.contribution)+'</b><small>Saldo após contribuição: '+money(x.remaining)+'</small></span></div>').join('');
+      section.innerHTML='<div class="fdRateioTitle">Divisão da casa</div>'+rows.data.map(x=>'<div class="fdSplitRow"><strong>'+escapeHtml(x.person_name)+'</strong><span>Contribuição <b>'+money(x.contribution)+'</b><small>Saldo após contribuição: '+money(x.remaining)+'</small></span></div>').join('');
     }catch(error){if(token===sequence&&section.isConnected)section.innerHTML='<p>Rateio indisponível: '+escapeHtml(error.message)+'</p>'}
   }
   let pending=false;
