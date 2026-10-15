@@ -8,7 +8,7 @@ async function open(){
 const sb=window.familyHomeSupabase,mask=document.createElement('div'),panel=document.createElement('section');mask.className='nuMask';panel.className='nuPanel';mask.append(panel);document.body.append(mask);
 const header=()=>{panel.replaceChildren();const h=document.createElement('header'),title=document.createElement('h2'),close=document.createElement('button');title.textContent='Nubank · Fatura única';close.textContent='Fechar';close.onclick=()=>mask.remove();h.append(title,close);panel.append(h)};
 const element=(tag,value)=>{const e=document.createElement(tag);e.textContent=value;return e};
-const button=(label,action)=>{const b=element('button',label);b.onclick=action;return b};
+const button=(label,action)=>{const b=element('button',label);b.type='button';b.onclick=action;return b};
 header();
 try{
 const user=(await sb.auth.getUser()).data.user;if(!user)throw Error('Entre na sua conta.');
@@ -35,7 +35,7 @@ const input=(label,value)=>{const wrap=document.createElement('label');wrap.text
 const title=input('Descrição',item?.title),amount=input('Valor',item?.amount==null?'':String(item.amount).replace('.',','));
 const wrap=document.createElement('label');wrap.textContent='Responsável';const owner=document.createElement('select');[['','Selecione'],['family','Família'],['hellen','Hellen'],['karina','Karina']].forEach(([v,t])=>owner.append(new Option(t,v)));owner.value=item?.allocation||'';wrap.append(owner);form.append(wrap);
 const category=input('Categoria',item?.category),installment=input('Parcela',item?.installment_label);
-const message=element('p','');form.append(button('Salvar',()=>{}),button('Cancelar',()=>refresh()),message);panel.append(form);
+const message=element('p','');const save=button('Salvar',()=>{});save.type='submit';form.append(save,button('Cancelar',()=>refresh()),message);panel.append(form);
 form.onsubmit=async e=>{e.preventDefault();const raw=amount.value.trim().replace(/\./g,'').replace(',','.');if(!/^\d+(?:\.\d{1,9})?$/.test(raw)||!owner.value){message.textContent='Informe valor e responsável.';return}
 const result=await sb.rpc('finance_save_card_line',{line_id:item?.id||null,statement_id:statement.id,new_title:title.value,new_amount:raw,new_allocation:owner.value,new_category:category.value,new_installment:installment.value});
 if(result.error){message.textContent=result.error.message;return}
