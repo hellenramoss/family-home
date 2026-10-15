@@ -28,6 +28,7 @@
 <link rel="stylesheet" href="/family-home/finance-payments.css?v=101" />
 <link rel="stylesheet" href="/family-home/finance-edit.css?v=106" />
 <link rel="stylesheet" href="/family-home/calendar-inline-actions.css?v=110" />
+<link rel="stylesheet" href="/family-home/house-order-assignee.css?v=112" />
 </head>
   <body>
     <div id="root"></div>
@@ -44,7 +45,7 @@
     <script src="/family-home/receipt-pdf-import.js?v=93" defer></script>
     <script src="/family-home/price-insights.js?v=92" defer></script>
     <script src="/family-home/replenishment-v2.js?v=92" defer></script>
-    <script src="/family-home/house-tasks.js?v=92" defer></script>
+    <script src="/family-home/house-tasks.js?v=112" defer></script>
     <script src="/family-home/people-manager-hotfix.js?v=92" defer></script>
     <script src="/family-home/dom-idempotency-hotfix.js?v=92" defer></script>
     <script src="/family-home/app-shell.js?v=92" defer></script>
@@ -64,12 +65,12 @@
 <script src="/family-home/calendar-connections.js?v=109" defer></script>
     <script src="/family-home/market-drag-v1.js?v=92" defer></script>
     <script src="/family-home/task-details-v1.js?v=92" defer></script>
-    <script src="/family-home/app-version-v1.js?v=110" defer></script>
+    <script src="/family-home/app-version-v1.js?v=112" defer></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', async () => {
           try {
-            const registration = await navigator.serviceWorker.register('/family-home/sw.js?v=110', { updateViaCache: 'none' });
+            const registration = await navigator.serviceWorker.register('/family-home/sw.js?v=112', { updateViaCache: 'none' });
             await registration.update();
           } catch {}
         });
