@@ -24,12 +24,12 @@ if(res.error)throw res.error;lines=res.data||[];header();
 const summary=element('p','Total da fatura: '+fmt(statement.amount));panel.append(summary);
 const unidentified=lines.filter(x=>!x.allocation).reduce((n,x)=>n+Number(x.amount||0),0);
 panel.append(element('p','Pendente de classificação: '+fmt(unidentified)));
-const personals=await sb.from('finance_nubank_personal_import').select('person,description,amount,installment,note,month').eq('family_id',profile.data.family_id).is('month',null);
+const personals=await sb.from('finance_nubank_personal_import').select('person,description,amount,installment,note,month').eq('family_id',profile.data.family_id).eq('month',month+'-01');
 if(!personals.error&&personals.data?.length){
 const block=document.createElement('details');block.style.cssText='padding:12px;background:#f0f3f9;border-radius:12px;margin:12px 0';
-const label=document.createElement('summary');label.textContent='Despesas pessoais da planilha · competência a confirmar ('+personals.data.length+')';block.append(label);
+const label=document.createElement('summary');label.textContent='Despesas pessoais de outubro · Hellen e Karina ('+personals.data.length+')';block.append(label);
 for(const x of personals.data){const row=document.createElement('div');row.className='nuLine';const who=x.person==='hellen'?'Hellen':'Karina';const info=document.createElement('span');info.append(element('b',x.description),element('small',who+' · '+(x.installment||'Sem parcela')));row.append(info,element('strong',fmt(x.amount)));block.append(row)}
-const note=element('p','Esses valores ainda não estão incluídos na fatura mensal para evitar duplicidade.');block.append(note);panel.append(block)
+const note=element('p','Itens pessoais classificados em outubro. Mantidos separados do total consolidado para evitar duplicidade até a conciliação.');block.append(note);panel.append(block)
 }
 
 const tabs=document.createElement('div');tabs.className='nuTabs';[['all','Todos'],['family','Família'],['hellen','Hellen'],['karina','Karina']].forEach(([key,label])=>{const b=button(label,()=>{filter=key;refresh()});if(key===filter)b.className='on';tabs.append(b)});panel.append(tabs);
