@@ -17,27 +17,19 @@ if(profile.error||profile.data?.role!=='admin')throw Error('A fatura compartilha
 const month=$('.financeDashboard .fdMonth')?.value||new Date().toLocaleDateString('sv-SE').slice(0,7);
 const q=await sb.from('finance_transactions').select('id,amount').eq('family_id',profile.data.family_id).eq('competence',month+'-01').eq('title','Cartão Nubank').is('owner_id',null).maybeSingle();
 if(q.error)throw q.error;if(!q.data)throw Error('Nenhuma fatura Nubank neste mês.');
-const statement=q.data;let lines=[],filter='all';
+const statement=q.data;let lines=[],personals=[],filter='family';
 async function refresh(){
 const res=await sb.from('finance_card_lines').select('id,title,amount,installment_label,allocation,category,source_row').eq('statement_transaction_id',statement.id).order('source_row');
 if(res.error)throw res.error;lines=res.data||[];header();
 const summary=element('p','Total da fatura: '+fmt(statement.amount));panel.append(summary);
-const unidentified=lines.filter(x=>!x.allocation).reduce((n,x)=>n+Number(x.amount||0),0);
-panel.append(element('p','Pendente de classificação: '+fmt(unidentified)));
-const personals=await sb.from('finance_nubank_personal_import').select('person,description,amount,installment,note,month').eq('family_id',profile.data.family_id).eq('month',month+'-01');
-if(!personals.error&&personals.data?.length){
-const block=document.createElement('details');block.style.cssText='padding:12px;background:#f0f3f9;border-radius:12px;margin:12px 0';
-const label=document.createElement('summary');label.textContent='Despesas pessoais de outubro · Hellen e Karina ('+personals.data.length+')';block.append(label);
-for(const x of personals.data){const row=document.createElement('div');row.className='nuLine';const who=x.person==='hellen'?'Hellen':'Karina';const info=document.createElement('span');info.append(element('b',x.description),element('small',who+' · '+(x.installment||'Sem parcela')));row.append(info,element('strong',fmt(x.amount)));block.append(row)}
-const note=element('p','Itens pessoais classificados em outubro. Mantidos separados do total consolidado para evitar duplicidade até a conciliação.');block.append(note);panel.append(block)
+const personalResult=await sb.from('finance_nubank_personal_import').select('person,description,amount,installment,note,month').eq('family_id',profile.data.family_id).eq('month',month+'-01');if(personalResult.error)throw personalResult.error;personals=personalResult.data||[];
+const tabs=document.createElement('div');tabs.className='nuTabs';[['all','Todos'],['family','Família'],['hellen','Hellen'],['karina','Karina']].forEach(([key,label])=>{const b=button(label,()=>{filter=key;refresh()});if(key===filter)b.className='on';tabs.append(b)});panel.append(tabs);
+const rows=filter==='all'?[...lines.map(x=>({kind:'family',...x})),...personals.map(x=>({kind:'personal',...x}))]:filter==='family'?lines.filter(x=>!x.allocation||x.allocation==='family').map(x=>({kind:'family',...x})):personals.filter(x=>x.person===filter).map(x=>({kind:'personal',...x}));
+const subtotal=rows.reduce((sum,x)=>sum+Number(x.amount||0),0);panel.append(element('p',rows.length+' compras · '+fmt(subtotal)));
+if(filter==='family'||filter==='all')panel.append(button('+ Novo lançamento',()=>edit(null)));
+for(const line of rows){const row=document.createElement('div');row.className='nuLine';const info=document.createElement('span');info.append(element('b',line.kind==='family'?line.title:line.description),element('small',[line.kind==='personal'?(line.person==='hellen'?'Hellen':'Karina'):line.allocation==='family'?'Família':'Fatura',line.kind==='family'?line.installment_label:line.installment].filter(Boolean).join(' · ')));row.append(info,element('strong',fmt(line.amount||0)));if(line.kind==='family')row.append(button('Editar',()=>edit(line)));panel.append(row)}
 }
 
-const tabs=document.createElement('div');tabs.className='nuTabs';[['all','Todos'],['family','Família'],['hellen','Hellen'],['karina','Karina']].forEach(([key,label])=>{const b=button(label,()=>{filter=key;refresh()});if(key===filter)b.className='on';tabs.append(b)});panel.append(tabs);
-panel.append(button('+ Novo lançamento',()=>edit(null)));
-for(const line of lines.filter(x=>filter==='all'||x.allocation===filter)){
- const row=document.createElement('div');row.className='nuLine';const info=document.createElement('span');info.append(element('b',line.title),element('small',[line.allocation||'A classificar',line.category||'Sem categoria',line.installment_label||''].filter(Boolean).join(' · ')));
- row.append(info,element('strong',line.amount===null?'Sem valor':fmt(line.amount)),button('Editar',()=>edit(line)));panel.append(row)}
-panel.append(element('p','Classificar uma compra não significa pagar a fatura. Os lançamentos importados permanecem preservados.'))}
 function edit(item){header();panel.append(element('h3',item?'Editar lançamento':'Novo lançamento'));const form=document.createElement('form');
 const input=(label,value)=>{const wrap=document.createElement('label');wrap.textContent=label;const control=document.createElement('input');control.value=value||'';control.required=label==='Descrição'||label==='Valor';wrap.append(control);form.append(wrap);return control};
 const title=input('Descrição',item?.title),amount=input('Valor',item?.amount==null?'':String(item.amount).replace('.',','));
