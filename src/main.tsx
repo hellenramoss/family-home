@@ -100,6 +100,8 @@ function App(){
   updateActive(l=>{
    const items=[...l.items];
    for(const r of replenishment){
+    // Repor apenas produtos com previsão calculada de até sete dias.
+    if(r.daysUntil===undefined||!Number.isFinite(r.daysUntil)||r.daysUntil>7)continue;
     const match=items.find(i=>normalize(i.name)===normalize(r.name));
     if(match){if(match.done){const idx=items.indexOf(match);items[idx]={...match,done:false,recordedPurchaseAt:undefined,price:undefined};}}
     else items.push({id:uid(),name:r.name,done:false,category:r.last.category||'other',quantity:r.last.quantity,unit:r.last.unit});
