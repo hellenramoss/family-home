@@ -95,9 +95,18 @@
     if(previous.some(x=>x.receiptKey===receiptKey||x.source===`NFC-e ${receiptKey}`||x.purchasedAt===purchasedAt))
       throw Error('Esta nota fiscal já foi importada. Os produtos dessa compra já estão no histórico.');
     const entries=[];
+    let pending = null;
     for(const parts of pages) {
-      const desc=parts.filter(x=>x.x<410 && /\(C[oó]digo:\s*\d+\s*\)/i.test(x.text));
-      // Alguns PDFs separam o código em um span, por isso a leitura usa as linhas inteiras.
+      // A consulta da Sefaz pode quebrar a última linha do produto entre páginas.
+      if(pending) {
+        const firstDescriptionY=Math.max(-Infinity,...parts.filter(x=>x.x<415 && /C[oó]digo:/i.test(x.text)).map(x=>x.y));
+        const beforeFirst=parts.filter(x=>x.y>firstDescriptionY+2);
+        const detailLine=beforeFirst.filter(x=>x.x<420).sort((a,b)=>a.x-b.x).map(x=>x.text).join(' ');
+        const detail=detailLine.match(/Qtde\.?\s*:\s*([\d.,]+)\s*UN:\s*(\w+)\s*Vl\.?\s*Unit\.?\s*:\s*([\d.,]+)/i);
+        const price=beforeFirst.filter(x=>x.x>418 && /^\d+[.,]\d{2}$/.test(x.text)).sort((a,b)=>b.y-a.y)[0];
+        if(detail&&price) entries.push({...pending,quantity:number(detail[1]),unit:detail[2].toLowerCase(),unitPrice:number(detail[3]),total:number(price.text)});
+        pending=null;
+      }
       const ys=[...new Set(parts.filter(x=>x.x<415 && /C[oó]digo:/i.test(x.text)).map(x=>x.y))];
       for(const y of ys){
         const line=parts.filter(x=>Math.abs(x.y-y)<2.0 && x.x<420).sort((a,b)=>a.x-b.x).map(x=>x.text).join(' ');
@@ -106,10 +115,9 @@
         const qtyParts=parts.filter(x=>x.y<y-3 && x.y>y-17 && x.x<420).sort((a,b)=>a.x-b.x);
         const qtyLine=qtyParts.map(x=>x.text).join(' ');
         const detail=qtyLine.match(/Qtde\.?\s*:\s*([\d.,]+)\s*UN:\s*(\w+)\s*Vl\.?\s*Unit\.?\s*:\s*([\d.,]+)/i);
-        const prices=parts.filter(x=>x.x>418 && x.y<y && x.y>y-17 && /^\d+[.,]\d{2}$/.test(x.text));
-        if(!detail||!prices.length) continue;
-        const total=number(prices.sort((a,b)=>b.y-a.y)[0].text);
-        entries.push({original:match[1].trim(),code:match[2],quantity:number(detail[1]),unit:detail[2].toLowerCase(),unitPrice:number(detail[3]),total});
+        const price=parts.filter(x=>x.x>418 && x.y<y && x.y>y-17 && /^\d+[.,]\d{2}$/.test(x.text)).sort((a,b)=>b.y-a.y)[0];
+        if(!detail||!price) {pending={original:match[1].trim(),code:match[2]};continue;}
+        entries.push({original:match[1].trim(),code:match[2],quantity:number(detail[1]),unit:detail[2].toLowerCase(),unitPrice:number(detail[3]),total:number(price.text)});
       }
     }
     if(!entries.length) throw Error('Não consegui identificar os produtos. PDFs digitalizados como imagem ainda não são aceitos.');
