@@ -66,12 +66,12 @@
 <script src="/family-home/calendar-connections.js?v=109" defer></script>
     <script src="/family-home/market-drag-v1.js?v=92" defer></script>
     <script src="/family-home/task-details-v1.js?v=92" defer></script>
-    <script src="/family-home/app-version-v1.js?v=121" defer></script>
+    <script src="/family-home/app-version-v1.js?v=122" defer></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', async () => {
           try {
-            const registration = await navigator.serviceWorker.register('/family-home/sw.js?v=121', { updateViaCache: 'none' });
+            const registration = await navigator.serviceWorker.register('/family-home/sw.js?v=122', { updateViaCache: 'none' });
             await registration.update();
           } catch {}
         });
