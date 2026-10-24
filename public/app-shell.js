@@ -6,6 +6,17 @@ const get=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}ca
 const uid=()=>crypto.randomUUID?.()||`${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const localDate=(d=new Date())=>{const x=new Date(d.getTime()-d.getTimezoneOffset()*60000);return x.toISOString().slice(0,10)};
+// Planejamento solicitado para a semana de 26/10/2026; mantém refeições existentes.
+const mealSeedKey='fh-meals-plan-2026-10-26-28-v1';
+if(!localStorage.getItem(mealSeedKey)){
+ const meals=get(K.meals,[]);
+ const planned=[
+  {date:'2026-10-26',type:'Almoço',title:'Bife de contrafilé acebolado com arroz, brócolis refogado e batata dourada'},
+  {date:'2026-10-28',type:'Almoço',title:'Coxinha da asa assada com arroz, abobrinha refogada e batata assada'}
+ ];
+ for(const meal of planned){if(!meals.some(x=>x.date===meal.date&&x.type===meal.type))meals.push({id:uid(),...meal});}
+ put(K.meals,meals);localStorage.setItem(mealSeedKey,'1');
+}
 const money=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const parseMoney=v=>Number(String(v||'0').replace(/\./g,'').replace(',','.'))||0;
 const dayNames=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
