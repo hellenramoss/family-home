@@ -1,4 +1,4 @@
-const CACHE='family-home-v25';
+const CACHE='family-home-v26';
 const APP='/family-home/';
 
 self.addEventListener('install',event=>{
@@ -29,7 +29,9 @@ self.addEventListener('fetch',event=>{
       })
       .catch(async()=>{
         const cached=await caches.match(event.request);
-        return cached||caches.match(APP);
+        if(cached)return cached;
+        if(event.request.mode==='navigate')return caches.match(APP);
+        return Response.error();
       })
   );
 });
