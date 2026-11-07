@@ -26,12 +26,12 @@ function App(){
  const[editingItemId,setEditingItemId]=useState<string|null>(null),[itemQuantity,setItemQuantity]=useState(''),[itemUnit,setItemUnit]=useState('un'),[itemNote,setItemNote]=useState(''),[itemPrice,setItemPrice]=useState('');
  const[categoryManager,setCategoryManager]=useState(false),[categoryEditor,setCategoryEditor]=useState(false),[editingCategoryId,setEditingCategoryId]=useState<string|null>(null),[categoryName,setCategoryName]=useState(''),[categoryEmoji,setCategoryEmoji]=useState('🏷️'),[historyOpen,setHistoryOpen]=useState(false),[insightsOpen,setInsightsOpen]=useState(false);
  const[historyEntryOpen,setHistoryEntryOpen]=useState(false),[historyName,setHistoryName]=useState(''),[historyDate,setHistoryDate]=useState(today()),[historyQuantity,setHistoryQuantity]=useState(''),[historyUnit,setHistoryUnit]=useState('un'),[historyPrice,setHistoryPrice]=useState(''),[historyCategory,setHistoryCategory]=useState('other');
- const cloudReady=useRef(false),applyingRemote=useRef(false),saveTimer=useRef<number|undefined>(undefined),ignoreRemoteUntil=useRef(0),swipeGesture=useRef<{id:string;x:number;y:number;startOffset:number;moved:boolean}|null>(null);
+ const cloudReady=useRef(false),applyingRemote=useRef(false),saveTimer=useRef<number|undefined>(undefined),ignoreRemoteUntil=useRef(0),localRevision=useRef(0),savedRevision=useRef(0),saveChain=useRef<Promise<unknown>>(Promise.resolve()),swipeGesture=useRef<{id:string;x:number;y:number;startOffset:number;moved:boolean}|null>(null);
  const[swipedItemId,setSwipedItemId]=useState<string|null>(null),[swipeOffset,setSwipeOffset]=useState<{id:string;x:number}|null>(null);
  const normalizeLists=(incoming:FamilyList[])=>incoming.map(l=>l.id==='market'||l.name.toUpperCase().includes('MERCADO')?{...l,categories:l.categories?.length?l.categories:marketCategories,purchaseHistory:l.purchaseHistory||[]}:{...l,categories:l.categories||[]});
  useEffect(()=>{
   let cancelled=false;
-  const applyRemote=(payload:unknown)=>{if(cancelled||!Array.isArray(payload)||Date.now()<ignoreRemoteUntil.current)return;applyingRemote.current=true;setLists(normalizeLists(payload as FamilyList[]));window.setTimeout(()=>{applyingRemote.current=false},0)};
+  const applyRemote=(payload:unknown)=>{if(cancelled||!Array.isArray(payload)||Date.now()<ignoreRemoteUntil.current||localRevision.current>savedRevision.current)return;applyingRemote.current=true;setLists(normalizeLists(payload as FamilyList[]));window.setTimeout(()=>{applyingRemote.current=false},0)};
   const connect=async()=>{const cloud=(window as any).familyHomeCloud;if(!cloud?.currentMembership)return;cloudReady.current=true;const remote=await cloud.loadLists?.();if(Array.isArray(remote)&&remote.length)applyRemote(remote);else await cloud.saveLists?.(lists)};
   const onReady=()=>{void connect()};
   const onData=(e:Event)=>applyRemote((e as CustomEvent).detail?.payload);
@@ -40,7 +40,21 @@ function App(){
   void connect();
   return()=>{cancelled=true;window.removeEventListener('family-home-family-ready',onReady);window.removeEventListener('family-home-cloud-data',onData)};
  },[]);
- useEffect(()=>{try{localStorage.setItem('family-home-lists',JSON.stringify(lists))}catch{}if(!cloudReady.current||applyingRemote.current)return;if(saveTimer.current)window.clearTimeout(saveTimer.current);saveTimer.current=window.setTimeout(()=>{void (window as any).familyHomeCloud?.saveLists?.(lists)},350);return()=>{if(saveTimer.current)window.clearTimeout(saveTimer.current)}},[lists]);
+ useEffect(()=>{try{localStorage.setItem('family-home-lists',JSON.stringify(lists))}catch{}if(!cloudReady.current||applyingRemote.current)return;
+  const revision=++localRevision.current;
+  if(saveTimer.current)window.clearTimeout(saveTimer.current);
+  saveTimer.current=window.setTimeout(()=>{
+   saveTimer.current=undefined;
+   // Serialize writes: a slower earlier save must never finish after a newer one.
+   saveChain.current=saveChain.current.catch(()=>{}).then(async()=>{
+    const cloud=(window as any).familyHomeCloud;
+    if(!cloud?.saveLists)return;
+    const ok=await cloud.saveLists(lists);
+    if(ok===true){savedRevision.current=Math.max(savedRevision.current,revision);ignoreRemoteUntil.current=Date.now()+2000;}
+   }).catch(error=>console.error('Family Home save:',error));
+  },500);
+  return()=>{if(saveTimer.current)window.clearTimeout(saveTimer.current)}
+ },[lists]);
  useEffect(()=>{try{if(activeId)localStorage.setItem('fh-active-list-id',activeId);else localStorage.removeItem('fh-active-list-id')}catch{}},[activeId]);
  const active=useMemo(()=>lists.find(l=>l.id===activeId),[lists,activeId]);
  const updateActive=(fn:(l:FamilyList)=>FamilyList)=>setLists(ls=>ls.map(l=>l.id===activeId?fn(l):l));
