@@ -19,64 +19,193 @@ const marketProduct=(label:string)=>{const name=normalize(label);if(/sache/.test
 const marketKey=(s:string)=>normalize(marketProduct(s));
 const dayMs=86400000;
 const today=()=>new Date().toISOString().slice(0,10);
+
+type EditorFields={name:string;category:string;quantity:string;unit:string;note:string;price:string};
+type ItemDraft={listId:string;itemId:string|null;base:EditorFields|null;fields:EditorFields};
+type ListCloud={
+ visibleLists?:FamilyList[];draftScope?:string;syncState:string;
+ editLists(before:FamilyList[],after:FamilyList[]):boolean;
+ retry():void;discardConflict():void;
+};
+const getCloud=()=>(window as Window&{familyHomeCloud?:ListCloud}).familyHomeCloud;
+function readLocal<T>(key:string,fallback:T):T{
+ try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}catch{return fallback}
+}
+const readCategory=()=>{try{return localStorage.getItem('family-home-last-category')||'other'}catch{return 'other'}};
+const fieldsOf=(item:Item):EditorFields=>({name:item.name,category:item.category||'other',
+ quantity:item.quantity||'',unit:item.unit||'un',note:item.note||'',price:item.price||''});
+const normalizeLists=(lists:FamilyList[])=>lists.map(list=>{
+ const market=list.id==='market'||list.name.toUpperCase().includes('MERCADO');
+ const categories=list.categories??(market?marketCategories:[]);
+ return {...list,categories,purchaseHistory:list.purchaseHistory||[]};
+});
+function SyncMessage({status}:{status:string}){
+ const messages:Record<string,string>={
+  waiting:'Conectando à família…',pending:'Alterações pendentes neste aparelho.',
+  syncing:'Sincronizando alterações…',offline:'Sem conexão. As alterações serão enviadas ao reconectar.',
+  error:'Sincronização indisponível. As alterações pendentes ficam neste aparelho.',
+  conflict:'A família alterou os mesmos dados. As suas alterações pendentes estão guardadas neste aparelho.',
+  storage:'Armazenamento indisponível. Mantenha o app aberto e tente sincronizar.'
+ };
+ if(!messages[status])return null;
+ return <div className="fhListSyncStatus" role="status">
+  <span>{messages[status]}</span>
+  {status==='error'&&<button type="button" onClick={()=>getCloud()?.retry()}>Tentar novamente</button>}
+  {status==='conflict'&&<button type="button" onClick={()=>getCloud()?.discardConflict()}>Carregar versão da família</button>}
+ </div>;
+}
+
 function App(){
- const[lists,setLists]=useState<FamilyList[]>(()=>{try{const s=localStorage.getItem('family-home-lists');const parsed:FamilyList[]=s?JSON.parse(s):seed;return parsed.map(l=>l.id==='market'||l.name.toUpperCase().includes('MERCADO')?{...l,categories:l.categories?.length?l.categories:marketCategories,purchaseHistory:l.purchaseHistory||[]}:l)}catch{return seed}});
+ const[lists,setLists]=useState<FamilyList[]>(()=>normalizeLists(getCloud()?.visibleLists??(getCloud()?[]:readLocal('family-home-lists',seed))));
  const[activeId,setActiveId]=useState<string|null>(()=>{try{return localStorage.getItem('fh-active-list-id')||null}catch{return null}}),[hideDone,setHideDone]=useState(true),[menu,setMenu]=useState(false),[homeMenu,setHomeMenu]=useState(false),[renameOpen,setRenameOpen]=useState(false),[renameListId,setRenameListId]=useState<string|null>(null),[renameValue,setRenameValue]=useState(''),[newList,setNewList]=useState(false),[listName,setListName]=useState(''),[listEmoji,setListEmoji]=useState('✨');
- const[addOpen,setAddOpen]=useState(false),[newItem,setNewItem]=useState(''),[itemCategory,setItemCategory]=useState(()=>localStorage.getItem('family-home-last-category')||'other'),[categoryPicker,setCategoryPicker]=useState(false),[collapsed,setCollapsed]=useState<Record<string,boolean>>({});
+ const[addOpen,setAddOpen]=useState(false),[newItem,setNewItem]=useState(''),[itemCategory,setItemCategory]=useState(readCategory),[categoryPicker,setCategoryPicker]=useState(false),[collapsed,setCollapsed]=useState<Record<string,boolean>>({});
  const[editingItemId,setEditingItemId]=useState<string|null>(null),[itemQuantity,setItemQuantity]=useState(''),[itemUnit,setItemUnit]=useState('un'),[itemNote,setItemNote]=useState(''),[itemPrice,setItemPrice]=useState('');
  const[categoryManager,setCategoryManager]=useState(false),[categoryEditor,setCategoryEditor]=useState(false),[editingCategoryId,setEditingCategoryId]=useState<string|null>(null),[categoryName,setCategoryName]=useState(''),[categoryEmoji,setCategoryEmoji]=useState('🏷️'),[historyOpen,setHistoryOpen]=useState(false),[insightsOpen,setInsightsOpen]=useState(false);
  const[historyEntryOpen,setHistoryEntryOpen]=useState(false),[historyName,setHistoryName]=useState(''),[historyDate,setHistoryDate]=useState(today()),[historyQuantity,setHistoryQuantity]=useState(''),[historyUnit,setHistoryUnit]=useState('un'),[historyPrice,setHistoryPrice]=useState(''),[historyCategory,setHistoryCategory]=useState('other');
- const cloudReady=useRef(false),applyingRemote=useRef(false),saveTimer=useRef<number|undefined>(undefined),ignoreRemoteUntil=useRef(0),localRevision=useRef(0),savedRevision=useRef(0),saveChain=useRef<Promise<unknown>>(Promise.resolve()),swipeGesture=useRef<{id:string;x:number;y:number;startOffset:number;moved:boolean}|null>(null);
+
+ const listsRef=useRef(lists);
+ const [syncStatus,setSyncStatus]=useState(getCloud()?.syncState||'waiting');
+ const [draftScope,setDraftScope]=useState(getCloud()?.draftScope);
+ const draftResume=useRef('');
+ const editorBase=useRef<EditorFields|null>(null);
+ const [editorOwner,setEditorOwner]=useState<string>();
+ const swipeGesture=useRef<{id:string;x:number;y:number;startOffset:number;moved:boolean}|null>(null);
  const[swipedItemId,setSwipedItemId]=useState<string|null>(null),[swipeOffset,setSwipeOffset]=useState<{id:string;x:number}|null>(null);
- const normalizeLists=(incoming:FamilyList[])=>incoming.map(l=>l.id==='market'||l.name.toUpperCase().includes('MERCADO')?{...l,categories:l.categories?.length?l.categories:marketCategories,purchaseHistory:l.purchaseHistory||[]}:{...l,categories:l.categories||[]});
+
+ function applyLists(incoming:FamilyList[]){
+  const next=normalizeLists(incoming);
+  listsRef.current=next;
+  setLists(next);
+ }
+
+ function commitLists(change:(current:FamilyList[])=>FamilyList[]){
+  const before=listsRef.current,next=change(before);
+  if(before===next)return true;
+  const cloud=getCloud();
+  if(cloud)return cloud.editLists(before,next);
+  try{localStorage.setItem('family-home-lists',JSON.stringify(next))}
+  catch{setSyncStatus('storage');return false}
+  applyLists(next);
+  return true;
+ }
+
  useEffect(()=>{
-  let cancelled=false;
-  const applyRemote=(payload:unknown)=>{if(cancelled||!Array.isArray(payload)||Date.now()<ignoreRemoteUntil.current||localRevision.current>savedRevision.current)return;applyingRemote.current=true;setLists(normalizeLists(payload as FamilyList[]));window.setTimeout(()=>{applyingRemote.current=false},0)};
-  const connect=async()=>{const cloud=(window as any).familyHomeCloud;if(!cloud?.currentMembership)return;cloudReady.current=true;const remote=await cloud.loadLists?.();if(Array.isArray(remote)&&remote.length)applyRemote(remote);else await cloud.saveLists?.(lists)};
-  const onReady=()=>{void connect()};
-  const onData=(e:Event)=>applyRemote((e as CustomEvent).detail?.payload);
-  window.addEventListener('family-home-family-ready',onReady);
+  const onData=(event:Event)=>{
+   const payload=(event as CustomEvent).detail?.payload;
+   if(Array.isArray(payload))applyLists(payload);
+   setDraftScope(getCloud()?.draftScope);
+  };
+  const onStatus=(event:Event)=>setSyncStatus((event as CustomEvent<string>).detail);
+  const onSeed=()=>{commitLists(current=>current.length?current:seed)};
+  const onEdit=(event:Event)=>{
+   const detail=(event as CustomEvent).detail;
+   if(typeof detail?.apply==='function')detail.saved=commitLists(detail.apply);
+  };
   window.addEventListener('family-home-cloud-data',onData);
-  void connect();
-  return()=>{cancelled=true;window.removeEventListener('family-home-family-ready',onReady);window.removeEventListener('family-home-cloud-data',onData)};
+  window.addEventListener('family-home-sync-status',onStatus);
+  window.addEventListener('family-home-seed-lists',onSeed);
+  window.addEventListener('family-home-list-edit',onEdit);
+  const cloud=getCloud();
+  if(cloud?.visibleLists)applyLists(cloud.visibleLists);
+  return()=>{
+   window.removeEventListener('family-home-cloud-data',onData);
+   window.removeEventListener('family-home-sync-status',onStatus);
+   window.removeEventListener('family-home-seed-lists',onSeed);
+   window.removeEventListener('family-home-list-edit',onEdit);
+  };
  },[]);
- useEffect(()=>{try{localStorage.setItem('family-home-lists',JSON.stringify(lists))}catch{}if(!cloudReady.current||applyingRemote.current)return;
-  const revision=++localRevision.current;
-  if(saveTimer.current)window.clearTimeout(saveTimer.current);
-  saveTimer.current=window.setTimeout(()=>{
-   saveTimer.current=undefined;
-   // Serialize writes: a slower earlier save must never finish after a newer one.
-   saveChain.current=saveChain.current.catch(()=>{}).then(async()=>{
-    const cloud=(window as any).familyHomeCloud;
-    if(!cloud?.saveLists)return;
-    const ok=await cloud.saveLists(lists);
-    if(ok===true){savedRevision.current=Math.max(savedRevision.current,revision);ignoreRemoteUntil.current=Date.now()+2000;}
-   }).catch(error=>console.error('Family Home save:',error));
-  },500);
-  return()=>{if(saveTimer.current)window.clearTimeout(saveTimer.current)}
- },[lists]);
  useEffect(()=>{try{if(activeId)localStorage.setItem('fh-active-list-id',activeId);else localStorage.removeItem('fh-active-list-id')}catch{}},[activeId]);
  const active=useMemo(()=>lists.find(l=>l.id===activeId),[lists,activeId]);
- const updateActive=(fn:(l:FamilyList)=>FamilyList)=>setLists(ls=>ls.map(l=>l.id===activeId?fn(l):l));
+ const updateActive=(fn:(l:FamilyList)=>FamilyList)=>commitLists(ls=>ls.map(l=>l.id===activeId?fn(l):l));
+ const editorFields:EditorFields={name:newItem,category:itemCategory,quantity:itemQuantity,unit:itemUnit,note:itemNote,price:itemPrice};
+ const scope=draftScope||(!getCloud()?'local':undefined);
+ const draftKey=scope?`fh-item-draft-v1:${scope}`:undefined;
+ const activeListId=active?.id;
+
+ function setEditorFields(fields:EditorFields){
+  setNewItem(fields.name);setItemCategory(fields.category);setItemQuantity(fields.quantity);
+  setItemUnit(fields.unit);setItemNote(fields.note);setItemPrice(fields.price);
+ }
+
+ useEffect(()=>{
+  if(!draftKey){draftResume.current='';setAddOpen(false);return}
+  if(!activeListId)return;
+  const resumeKey=`${draftKey}:${activeListId}`;
+  if(draftResume.current===resumeKey)return;
+  draftResume.current=resumeKey;
+  setAddOpen(false);
+  const draft=readLocal<ItemDraft|null>(draftKey,null);
+  if(draft?.listId!==activeListId)return;
+  setEditorOwner(draftKey);
+  setEditingItemId(draft.itemId);
+  editorBase.current=draft.base;
+  setEditorFields(draft.fields);
+  setAddOpen(true);
+ },[draftKey,activeListId]);
+
+ useEffect(()=>{
+  if(!addOpen||!draftKey||editorOwner!==draftKey||!activeListId||draftResume.current!==`${draftKey}:${activeListId}`)return;
+  const draft:ItemDraft={listId:activeListId,itemId:editingItemId,base:editorBase.current,
+   fields:{name:newItem,category:itemCategory,quantity:itemQuantity,unit:itemUnit,note:itemNote,price:itemPrice}};
+  try{localStorage.setItem(draftKey,JSON.stringify(draft))}
+  catch{setSyncStatus('storage')}
+ },[addOpen,draftKey,editorOwner,activeListId,editingItemId,newItem,itemCategory,itemQuantity,itemUnit,itemNote,itemPrice]);
  useEffect(()=>{
   const onReceipt=(event:Event)=>{
    const {receiptKey,entries}=(event as CustomEvent).detail||{};
    if(!receiptKey||!Array.isArray(entries)||!entries.length)return;
-   setLists(current=>current.map(list=>{
-    if(list.id!=='market'&&!/MERCADO|COMPRAS/i.test(list.name))return list;
-    if((list.purchaseHistory||[]).some(record=>(record as any).receiptKey===receiptKey))return list;
-    return {...list,purchaseHistory:[...(list.purchaseHistory||[]),...entries]};
-   }));
+   const saved=commitLists(current=>{
+    const market=current.find(list=>list.id==='market')??current.find(list=>/MERCADO|COMPRAS/i.test(list.name));
+    if(!market||(market.purchaseHistory||[]).some(record=>(record as PurchaseRecord&{receiptKey?:string}).receiptKey===receiptKey))return current;
+    return current.map(list=>list.id===market.id?{...list,purchaseHistory:[...(list.purchaseHistory||[]),...entries]}:list);
+   });
+   (event as CustomEvent).detail.saved=saved;
+   if(!saved)return;
    setHistoryOpen(true);
   };
   window.addEventListener('family-home-receipt-import',onReceipt);
   return()=>window.removeEventListener('family-home-receipt-import',onReceipt);
  },[]);
  const resetEditor=()=>{setEditingItemId(null);setNewItem('');setItemQuantity('');setItemUnit('un');setItemNote('');setItemPrice('');setCategoryPicker(false)};
- const openAdd=()=>{resetEditor();setItemCategory('other');try{const k='fh-house-meta-v1',v=JSON.parse(localStorage.getItem(k)||'{}');delete v.draft;localStorage.setItem(k,JSON.stringify(v))}catch{}setAddOpen(true)};
- const openEdit=(item:Item)=>{setEditingItemId(item.id);setNewItem(item.name);setItemQuantity(item.quantity||'');setItemUnit(item.unit||'un');setItemNote(item.note||'');setItemPrice(item.price||'');setItemCategory(item.category||'other');setCategoryPicker(false);setAddOpen(true)};
- const closeAdd=()=>{setAddOpen(false);resetEditor()};
- const saveItem=()=>{const name=newItem.trim();if(!name)return;
+ const openAdd=()=>{setEditorOwner(draftKey);editorBase.current=null;resetEditor();setItemCategory('other');try{const k='fh-house-meta-v1',v=JSON.parse(localStorage.getItem(k)||'{}');delete v.draft;localStorage.setItem(k,JSON.stringify(v))}catch{}setAddOpen(true)};
+ const openEdit=(item:Item)=>{
+  setEditorOwner(draftKey);editorBase.current=fieldsOf(item);setEditingItemId(item.id);setEditorFields(editorBase.current);
+  setCategoryPicker(false);setAddOpen(true);
+ };
+ const closeAdd=()=>{
+  try{if(draftKey)localStorage.removeItem(draftKey)}catch{}
+  setAddOpen(false);resetEditor();
+ };
+ const saveItem=()=>{
+ const name=newItem.trim();
+ if(!name||!active)return;
+ const old=active.items.find(item=>item.id===editingItemId);
+ const edits={...editorFields,name,quantity:itemQuantity.trim(),note:itemNote.trim(),price:itemPrice.trim()};
+ const fields=Object.keys(edits) as (keyof EditorFields)[];
+ if(editingItemId&&(!old||!editorBase.current)){
+  alert('Este item mudou enquanto você editava. O rascunho permanece aberto.');return;
+ }
+ if(old&&editorBase.current){
+  const current=fieldsOf(old),base=editorBase.current;
+  for(const field of fields){
+   if(edits[field]===base[field])edits[field]=current[field];
+   else if(current[field]!==base[field]&&current[field]!==edits[field]){
+    alert('Outra pessoa alterou este campo. O rascunho permanece aberto.');return;
+   }
+  }
+ }
+ const changed={name:edits.name,category:edits.category,quantity:edits.quantity||undefined,
+  unit:edits.quantity?edits.unit:undefined,note:edits.note||undefined,price:edits.price||undefined};
+ const saved=updateActive(list=>{
+  const categories=list.categories||[];
+  const defaultCategory=marketCategories.find(category=>category.id===edits.category&&category.id!=='other');
+  const needsCategory=defaultCategory&&(list.id==='market'||/MERCADO/i.test(list.name))&&
+   !categories.some(category=>category.id===defaultCategory.id);
+  return {...list,categories:needsCategory?[...categories,defaultCategory]:categories,items:old
+   ?list.items.map(item=>item.id===old.id?{...item,...changed}:item)
+   :[...list.items,{id:uid(),done:false,...changed}]};
+ });
+ if(!saved)return;
  if(active?.id==='house'||/TAREFAS DA CASA/i.test(active?.name||'')){
   try{
    const key=(value:string)=>normalize(value);
@@ -89,9 +218,14 @@ function App(){
    window.dispatchEvent(new Event('family-home-task-meta-updated'));
   }catch(e){console.error('Task details:',e)}
  }
- updateActive(l=>editingItemId?{...l,items:l.items.map(i=>i.id===editingItemId?{...i,name,category:itemCategory,quantity:itemQuantity.trim()||undefined,unit:itemQuantity.trim()?itemUnit:undefined,note:itemNote.trim()||undefined,price:itemPrice.trim()||undefined}:i)}:{...l,items:[...l.items,{id:uid(),name,done:false,category:itemCategory,quantity:itemQuantity.trim()||undefined,unit:itemQuantity.trim()?itemUnit:undefined,note:itemNote.trim()||undefined,price:itemPrice.trim()||undefined}]});closeAdd()};
- const deleteItemById=(id:string)=>{setLists(ls=>{const next=ls.map(l=>l.id===activeId?{...l,items:l.items.filter(i=>i.id!==id)}:l);ignoreRemoteUntil.current=Date.now()+1800;if(saveTimer.current)window.clearTimeout(saveTimer.current);try{localStorage.setItem('family-home-lists',JSON.stringify(next))}catch{}const cloud=(window as any).familyHomeCloud;if(cloudReady.current&&cloud?.saveLists)void cloud.saveLists(next).finally(()=>window.setTimeout(()=>{ignoreRemoteUntil.current=0},450));return next});setSwipedItemId(null);setSwipeOffset(null)};
- const deleteItem=()=>{if(!editingItemId)return;const id=editingItemId;closeAdd();deleteItemById(id)};
+ closeAdd()
+ };
+ const deleteItemById=(id:string)=>{
+  const saved=updateActive(list=>({...list,items:list.items.filter(item=>item.id!==id)}));
+  if(saved){setSwipedItemId(null);setSwipeOffset(null)}
+  return saved;
+ };
+ const deleteItem=()=>{if(editingItemId&&deleteItemById(editingItemId))closeAdd()};
  const swipeStart=(id:string,e:React.TouchEvent)=>{if(e.touches.length!==1)return;const t=e.touches[0];swipeGesture.current={id,x:t.clientX,y:t.clientY,startOffset:swipedItemId===id?-78:0,moved:false};setSwipeOffset({id,x:swipedItemId===id?-78:0})};
  const swipeMove=(id:string,e:React.TouchEvent)=>{const g=swipeGesture.current;if(!g||g.id!==id||e.touches.length!==1)return;const t=e.touches[0],dx=t.clientX-g.x,dy=t.clientY-g.y;if(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>7)return;if(Math.abs(dx)>6)g.moved=true;const x=Math.max(-84,Math.min(0,g.startOffset+dx));setSwipeOffset({id,x})};
  const swipeEnd=(id:string)=>{const g=swipeGesture.current;if(!g||g.id!==id)return;const x=swipeOffset?.id===id?swipeOffset.x:g.startOffset;const open=x<-38;setSwipedItemId(open?id:null);setSwipeOffset(open?{id,x:-78}:null);window.setTimeout(()=>{swipeGesture.current=null},0)};
@@ -100,9 +234,9 @@ function App(){
  const openHistoryEntry=()=>{setHistoryName('');setHistoryDate(today());setHistoryQuantity('');setHistoryUnit('un');setHistoryPrice('');setHistoryCategory('other');setHistoryEntryOpen(true)};
  const saveHistoryEntry=()=>{const name=historyName.trim();if(!name||!historyDate)return;const purchasedAt=new Date(`${historyDate}T12:00:00`).toISOString();updateActive(l=>({...l,purchaseHistory:[...(l.purchaseHistory||[]),{id:uid(),itemName:name,category:historyCategory,quantity:historyQuantity.trim()||undefined,unit:historyQuantity.trim()?historyUnit:undefined,price:historyPrice.trim()||undefined,purchasedAt}]}));setHistoryEntryOpen(false)};
  const chooseCategory=(id:string)=>{setItemCategory(id);setCategoryPicker(false)};
- const createList=()=>{const name=listName.trim();if(!name)return;setLists(c=>[...c,{id:uid(),name:name.toUpperCase(),emoji:listEmoji.trim()||'✨',items:[],categories:[]}]);setListName('');setListEmoji('✨');setNewList(false)};
+ const createList=()=>{const name=listName.trim();if(!name)return;if(!commitLists(c=>[...c,{id:uid(),name:name.toUpperCase(),emoji:listEmoji.trim()||'✨',items:[],categories:[]}]))return;setListName('');setListEmoji('✨');setNewList(false)};
  const openRenameList=(list:FamilyList)=>{setRenameListId(list.id);setRenameValue(list.name);setRenameOpen(true);setHomeMenu(false)};
- const saveRenameList=()=>{const name=renameValue.trim();if(!name||!renameListId)return;setLists(ls=>ls.map(l=>l.id===renameListId?{...l,name}:l));setRenameOpen(false);setRenameListId(null);setRenameValue('')};
+ const saveRenameList=()=>{const name=renameValue.trim();if(!name||!renameListId)return;if(!commitLists(ls=>ls.map(l=>l.id===renameListId?{...l,name}:l)))return;setRenameOpen(false);setRenameListId(null);setRenameValue('')};
  const startNewCategory=()=>{setEditingCategoryId(null);setCategoryName('');setCategoryEmoji('🏷️');setCategoryEditor(true)};
  const startEditCategory=(cat:Category)=>{if(cat.id==='other')return;setEditingCategoryId(cat.id);setCategoryName(cat.name);setCategoryEmoji(cat.emoji);setCategoryEditor(true)};
  const saveCategory=()=>{const name=categoryName.trim();if(!name)return;const emoji=categoryEmoji.trim()||'🏷️';updateActive(l=>{const cats=[...(l.categories||[])];return editingCategoryId?{...l,categories:cats.map(c=>c.id===editingCategoryId?{...c,name,emoji}:c)}:{...l,categories:[...cats,{id:uid(),name,emoji}]}});setCategoryEditor(false);setEditingCategoryId(null);setCategoryName('');setCategoryEmoji('🏷️')};
@@ -132,6 +266,7 @@ function App(){
  const addFromHistory=(r:Replenishment)=>{updateActive(l=>{const existing=l.items.find(i=>marketKey(i.name)===marketKey(r.name));if(existing)return{...l,items:l.items.map(i=>i.id===existing.id?{...i,done:false,recordedPurchaseAt:undefined,price:undefined,category:i.category||r.last.category,quantity:i.quantity||r.last.quantity,unit:i.unit||r.last.unit}:i)};return{...l,items:[...l.items,{id:uid(),name:r.name,done:false,category:r.last.category||'other',quantity:r.last.quantity,unit:r.last.unit}]}})};
   const toggleItem=(id:string)=>updateActive(l=>({...l,items:l.items.map(i=>i.id===id?{...i,done:!i.done,...(i.done?{recordedPurchaseAt:undefined}:{})}:i)}));
   return <main className="app nativeApp" onClick={()=>menu&&setMenu(false)}>
+   {getCloud()&&<SyncMessage status={syncStatus}/>}
    <header className="listHeader"><button className="icon" onClick={e=>{e.stopPropagation();setActiveId(null);setMenu(false)}}><ChevronLeft/></button><h1>{active.name} <span>{active.emoji}</span></h1><button className="icon" onClick={e=>{e.stopPropagation();setMenu(v=>!v)}}><MoreHorizontal/></button></header>
    {menu&&<div className="menu" onClick={e=>e.stopPropagation()}><button onClick={()=>{setHideDone(v=>!v);setMenu(false)}}>{hideDone?<Eye/>:<EyeOff/>}{hideDone?'Mostrar concluídos':'Ocultar concluídos'}</button>{isMarket&&<><button onClick={()=>{setInsightsOpen(true);setMenu(false)}}><Sparkles/>Reposição inteligente</button><button onClick={()=>{setHistoryOpen(true);setMenu(false)}}><Clock3/>Histórico de compras</button><button onClick={()=>{setMenu(false);(window as any).familyHomeOpenReceiptPdf?.()}}><ShoppingCart/>Importar nota fiscal (PDF)</button></>}<button onClick={()=>{setCategoryManager(true);setMenu(false)}}><Pencil/>Gerenciar categorias</button><button onClick={()=>{updateActive(l=>({...l,items:l.items.map(i=>({...i,done:false,recordedPurchaseAt:undefined}))}));setMenu(false)}}><RotateCcw/>Desmarcar todos</button><button onClick={()=>{updateActive(l=>({...l,items:l.items.map(i=>({...i,done:true}))}));setMenu(false)}}><Check/>Concluir todos</button><button className="danger" onClick={()=>{updateActive(l=>({...l,items:l.items.filter(i=>!i.done)}));setMenu(false)}}><Trash2/>Excluir concluídos</button></div>}
    {isMarket&&<button className="quickAdd" onClick={openAdd}><Plus/><span>Adicionar um item</span></button>}
@@ -140,9 +275,9 @@ function App(){
    {insightsOpen&&<div className="nativeOverlay"><section className="nativeSheet insightsSheet"><div className="nativeSheetHead"><button onClick={()=>setInsightsOpen(false)}><X/></button><h2>Reposição</h2><span/></div><div className="replenishAllWrap"><button className="replenishAllButton" onClick={replenishAll} disabled={!replenishment.length}>+ Repor tudo na lista</button><small>Adiciona as sugestões e reativa itens concluídos sem duplicar.</small></div><div className="insightsIntro"><Sparkles/><div><strong>O Family Home aprende com suas compras</strong><small>Depois de pelo menos 2 compras do mesmo item, calculamos o intervalo médio e estimamos quando ele pode acabar.</small></div></div><div className="insightsList">{replenishment.length===0?<div className="historyEmpty">Importe uma nota fiscal para começar a criar seu histórico.</div>:replenishment.map(r=>{const inList=active.items.some(i=>marketKey(i.name)===marketKey(r.name)&&!i.done);const status=r.averageDays===undefined?'aprendendo':(r.daysUntil??0)<=0?'hora de repor':(r.daysUntil??0)<=3?'repor em breve':`em ${r.daysUntil} dias`;return <div className="insightRow" key={normalize(r.name)}><div className="insightMain"><strong>{r.name}</strong><small>{r.averageDays?`Costuma durar ~${r.averageDays} dias · última compra ${new Date(r.last.purchasedAt).toLocaleDateString('pt-BR')}`:`${r.count}/2 compras para aprender o intervalo`}</small>{r.last.price&&<small>Último preço por unidade: {unitMoney(r.last)}</small>}</div><div className="insightAction"><span className={`insightStatus ${r.averageDays&&((r.daysUntil??0)<=3)?'due':''}`}>{status}</span><button disabled={inList} onClick={()=>addFromHistory(r)}>{inList?'na lista':'+ adicionar'}</button></div></div>})}</div></section></div>}
    {historyOpen&&<div className="nativeOverlay"><section className="nativeSheet historySheet"><div className="nativeSheetHead"><button onClick={()=>setHistoryOpen(false)}><X/></button><h2>Histórico</h2><button className="confirm" onClick={openHistoryEntry}><Plus/></button></div><div className="historyList">{history.length===0?<div className="historyEmpty">Nenhuma compra registrada ainda.</div>:history.map(h=><div className="historyRow" key={h.id}><div><strong>{h.itemName}</strong><small>{new Date(h.purchasedAt).toLocaleDateString('pt-BR')}{h.quantity?` · ${h.quantity} ${h.unit||''}`:''}</small></div><b>{unitMoney(h)} / {h.unit||'un'}{h.price&&h.quantity&&Number(h.quantity.replace(',','.'))>1?<small> Total: {money(h.price)}</small>:null}</b></div>)}</div>{historyEntryOpen&&<div className="pickerScrim" onClick={()=>setHistoryEntryOpen(false)}><section className="categoryEditor historyEntryForm" onClick={e=>e.stopPropagation()}><div className="pickerHandle"/><div className="pickerTitle"><h2>Registrar compra anterior</h2></div><label>Produto<input value={historyName} onChange={e=>setHistoryName(e.target.value)} placeholder="Ex.: Leite"/></label><label>Data<input type="date" value={historyDate} max={today()} onChange={e=>setHistoryDate(e.target.value)}/></label><div className="historyEntryGrid"><label>Quantidade<input inputMode="decimal" value={historyQuantity} onChange={e=>setHistoryQuantity(e.target.value)} placeholder="1"/></label><label>Unidade<select value={historyUnit} onChange={e=>setHistoryUnit(e.target.value)}><option>un</option><option>kg</option><option>g</option><option>L</option><option>ml</option><option>pct</option></select></label></div><label>Preço pago<input inputMode="decimal" value={historyPrice} onChange={e=>setHistoryPrice(e.target.value)} placeholder="0,00"/></label><label>Categoria<select value={historyCategory} onChange={e=>setHistoryCategory(e.target.value)}>{cats.map(cat=><option key={cat.id} value={cat.id}>{cat.emoji} {cat.name}</option>)}</select></label><button className="primaryAction" onClick={saveHistoryEntry}>Registrar compra</button></section></div>}</section></div>}
    {categoryManager&&<div className="nativeOverlay"><section className="nativeSheet manageSheet"><div className="nativeSheetHead"><button onClick={()=>setCategoryManager(false)}><X/></button><h2>Categorias</h2><button className="confirm" onClick={startNewCategory}><Plus/></button></div><div className="manageList">{cats.map(cat=><div className="manageCategoryRow" key={cat.id}><button className="manageCategoryMain" onClick={()=>startEditCategory(cat)}><span>{cat.emoji}</span><strong>{cat.name}</strong></button>{cat.id!=='other'&&<div className="categoryMoveControls"><button type="button" onClick={()=>moveCategory(cat.id,-1)} aria-label={`Subir ${cat.name}`}>↑</button><button type="button" onClick={()=>moveCategory(cat.id,1)} aria-label={`Descer ${cat.name}`}>↓</button></div>}{cat.id!=='other'&&<button className="miniDanger" onClick={()=>deleteCategory(cat.id)}><Trash2 size={20}/></button>}</div>)}</div>{categoryEditor&&<div className="pickerScrim" onClick={()=>setCategoryEditor(false)}><section className="categoryEditor" onClick={e=>e.stopPropagation()}><div className="pickerHandle"/><div className="pickerTitle"><h2>{editingCategoryId?'Editar categoria':'Nova categoria'}</h2></div><label>Emoji<input className="categoryEmojiInput" value={categoryEmoji} onChange={e=>setCategoryEmoji(e.target.value)}/></label><label>Nome<input value={categoryName} onChange={e=>setCategoryName(e.target.value)} placeholder="Ex.: Padaria"/></label><button className="primaryAction" onClick={saveCategory}>{editingCategoryId?'Salvar alterações':'Criar categoria'}</button></section></div>}</section></div>}
-   {addOpen&&<div className="nativeOverlay"><section className="nativeSheet"><div className="nativeSheetHead"><button onClick={closeAdd}><X/></button><h2>{editingItemId?'Editar':'Adicionar'}</h2><button className="confirm" onClick={saveItem}><Check/></button></div><div className="nativeCard"><label className="nativeRow nameRow"><span className="emptyCircle"/><input value={newItem} onChange={e=>setNewItem(e.target.value)} placeholder="Nome"/></label><button className="nativeRow fhCatRow" onClick={()=>setCategoryPicker(true)}><span className="rowEmoji">{selected.emoji}</span><span>{selected.name}</span></button>{isMarket&&<><div className="nativeRow quantityRow"><span className="lineIcon">#</span><input inputMode="decimal" value={itemQuantity} onChange={e=>setItemQuantity(e.target.value)} placeholder="Quantidade"/><select value={itemUnit} onChange={e=>setItemUnit(e.target.value)}><option>un</option><option>kg</option><option>g</option><option>L</option><option>ml</option><option>pct</option></select></div><label className="nativeRow priceRow"><span className="lineIcon">R$</span><input inputMode="decimal" value={itemPrice} onChange={e=>setItemPrice(e.target.value)} placeholder="Preço pago"/></label></>}<button className="nativeRow"><span className="lineIcon">♙</span><span>Atribuir a</span></button><button className="nativeRow mutedRow"><span className="lineIcon">▣</span><span>Definir data e lembrete</span></button><button className="nativeRow mutedRow"><span className="lineIcon">↻</span><span>Repetir</span></button><div className="nativeRow"><span className="lineIcon">🛒</span><span>{active.name}</span></div><label className="nativeRow noteRow"><span className="lineIcon">▤</span><input value={itemNote} onChange={e=>setItemNote(e.target.value)} placeholder="Adicionar nota"/></label>{editingItemId&&<button className="nativeRow deleteItemRow" onClick={deleteItem}><Trash2 size={21}/><span>Excluir item</span></button>}</div>{categoryPicker&&<div className="pickerScrim" onClick={()=>setCategoryPicker(false)}><section className="categoryPicker" onClick={e=>e.stopPropagation()}><div className="pickerHandle"/><div className="pickerTitle"><h2>Categorias</h2><button onClick={()=>{setCategoryPicker(false);setAddOpen(false);setCategoryManager(true);startNewCategory()}}><Plus/></button></div><div className="categoryOptions">{cats.map(cat=><button className="categoryOption" key={cat.id} onClick={()=>chooseCategory(cat.id)}><span className="categoryEmoji">{cat.emoji}</span><span>{cat.name}</span><span className={`radio ${itemCategory===cat.id?'selected':''}`}>{itemCategory===cat.id&&<i/>}</span></button>)}</div></section></div>}</section></div>}
+   {addOpen&&<div className="nativeOverlay"><section className="nativeSheet"><div className="nativeSheetHead"><button aria-label="Fechar edição" onClick={closeAdd}><X/></button><h2>{editingItemId?'Editar':'Adicionar'}</h2><button className="confirm" aria-label="Salvar item" onClick={saveItem}><Check/></button></div><div className="nativeCard"><label className="nativeRow nameRow"><span className="emptyCircle"/><input value={newItem} onChange={e=>setNewItem(e.target.value)} placeholder="Nome"/></label><button className="nativeRow fhCatRow" onClick={()=>setCategoryPicker(true)}><span className="rowEmoji">{selected.emoji}</span><span>{selected.name}</span></button>{isMarket&&<><div className="nativeRow quantityRow"><span className="lineIcon">#</span><input inputMode="decimal" value={itemQuantity} onChange={e=>setItemQuantity(e.target.value)} placeholder="Quantidade"/><select value={itemUnit} onChange={e=>setItemUnit(e.target.value)}><option>un</option><option>kg</option><option>g</option><option>L</option><option>ml</option><option>pct</option></select></div><label className="nativeRow priceRow"><span className="lineIcon">R$</span><input inputMode="decimal" value={itemPrice} onChange={e=>setItemPrice(e.target.value)} placeholder="Preço pago"/></label></>}<button className="nativeRow"><span className="lineIcon">♙</span><span>Atribuir a</span></button><button className="nativeRow mutedRow"><span className="lineIcon">▣</span><span>Definir data e lembrete</span></button><button className="nativeRow mutedRow"><span className="lineIcon">↻</span><span>Repetir</span></button><div className="nativeRow"><span className="lineIcon">🛒</span><span>{active.name}</span></div><label className="nativeRow noteRow"><span className="lineIcon">▤</span><input value={itemNote} onChange={e=>setItemNote(e.target.value)} placeholder="Adicionar nota"/></label>{editingItemId&&<button className="nativeRow deleteItemRow" onClick={deleteItem}><Trash2 size={21}/><span>Excluir item</span></button>}</div>{categoryPicker&&<div className="pickerScrim" onClick={()=>setCategoryPicker(false)}><section className="categoryPicker" onClick={e=>e.stopPropagation()}><div className="pickerHandle"/><div className="pickerTitle"><h2>Categorias</h2><button onClick={()=>{setCategoryPicker(false);setAddOpen(false);setCategoryManager(true);startNewCategory()}}><Plus/></button></div><div className="categoryOptions">{cats.map(cat=><button className="categoryOption" key={cat.id} onClick={()=>chooseCategory(cat.id)}><span className="categoryEmoji">{cat.emoji}</span><span>{cat.name}</span><span className={`radio ${itemCategory===cat.id?'selected':''}`}>{itemCategory===cat.id&&<i/>}</span></button>)}</div></section></div>}</section></div>}
   </main>
  }
- return <main className="app" onClick={()=>homeMenu&&setHomeMenu(false)}><header className="homeHeader"><div/><h1>Lists</h1><button className="icon" onClick={e=>{e.stopPropagation();setHomeMenu(v=>!v)}}><MoreHorizontal/></button></header>{homeMenu&&<div className="menu homeListMenu" onClick={e=>e.stopPropagation()}><button onClick={()=>{setHomeMenu(false);setRenameOpen(true);setRenameListId(null);setRenameValue('')}}><Pencil/>Editar nomes das listas</button></div>}<section className="lists">{lists.map(list=>{const p=list.items.filter(i=>!i.done).length;return <div className="listRowWrap" key={list.id}><button className="listRow" onClick={()=>setActiveId(list.id)}><span className="emoji">{list.emoji}</span><span className="listText"><strong>{list.name}</strong><small>♧ Shared with family</small></span><span className={`count ${p===0?'complete':''}`}>{p===0?<Check/>:p}</span></button>{renameOpen&&!renameListId&&<button className="renameQuick" aria-label={`Editar nome de ${list.name}`} onClick={()=>openRenameList(list)}><Pencil size={18}/></button>}</div>})}</section><button className="fab" onClick={()=>setNewList(true)}><Plus/></button>{renameOpen&&renameListId&&<div className="overlay" onClick={()=>setRenameOpen(false)}><div className="sheet renameSheet" onClick={e=>e.stopPropagation()}><div className="sheetTitle"><button className="icon" onClick={()=>setRenameOpen(false)}><X/></button><h2>Editar nome</h2><button className="save" onClick={saveRenameList}>Salvar</button></div><label>Nome<input autoFocus value={renameValue} onChange={e=>setRenameValue(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveRenameList()}}/></label></div></div>}{renameOpen&&!renameListId&&<div className="renameHint">Toque no lápis da lista que deseja renomear.</div>}{newList&&<div className="overlay" onClick={()=>setNewList(false)}><div className="sheet" onClick={e=>e.stopPropagation()}><div className="sheetTitle"><button className="icon" onClick={()=>setNewList(false)}><X/></button><h2>New list</h2><button className="save" onClick={createList}>Create</button></div><label>Emoji<input className="emojiInput" value={listEmoji} onChange={e=>setListEmoji(e.target.value)}/></label><label>Name<input autoFocus value={listName} onChange={e=>setListName(e.target.value)} placeholder="Ex.: VIAGEM"/></label></div></div>}</main>
+ return <main className="app" onClick={()=>homeMenu&&setHomeMenu(false)}>{getCloud()&&<SyncMessage status={syncStatus}/>}<header className="homeHeader"><div/><h1>Lists</h1><button className="icon" onClick={e=>{e.stopPropagation();setHomeMenu(v=>!v)}}><MoreHorizontal/></button></header>{homeMenu&&<div className="menu homeListMenu" onClick={e=>e.stopPropagation()}><button onClick={()=>{setHomeMenu(false);setRenameOpen(true);setRenameListId(null);setRenameValue('')}}><Pencil/>Editar nomes das listas</button></div>}<section className="lists">{lists.map(list=>{const p=list.items.filter(i=>!i.done).length;return <div className="listRowWrap" key={list.id}><button className="listRow" onClick={()=>setActiveId(list.id)}><span className="emoji">{list.emoji}</span><span className="listText"><strong>{list.name}</strong><small>♧ Shared with family</small></span><span className={`count ${p===0?'complete':''}`}>{p===0?<Check/>:p}</span></button>{renameOpen&&!renameListId&&<button className="renameQuick" aria-label={`Editar nome de ${list.name}`} onClick={()=>openRenameList(list)}><Pencil size={18}/></button>}</div>})}</section><button className="fab" onClick={()=>setNewList(true)}><Plus/></button>{renameOpen&&renameListId&&<div className="overlay" onClick={()=>setRenameOpen(false)}><div className="sheet renameSheet" onClick={e=>e.stopPropagation()}><div className="sheetTitle"><button className="icon" onClick={()=>setRenameOpen(false)}><X/></button><h2>Editar nome</h2><button className="save" onClick={saveRenameList}>Salvar</button></div><label>Nome<input autoFocus value={renameValue} onChange={e=>setRenameValue(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveRenameList()}}/></label></div></div>}{renameOpen&&!renameListId&&<div className="renameHint">Toque no lápis da lista que deseja renomear.</div>}{newList&&<div className="overlay" onClick={()=>setNewList(false)}><div className="sheet" onClick={e=>e.stopPropagation()}><div className="sheetTitle"><button className="icon" onClick={()=>setNewList(false)}><X/></button><h2>New list</h2><button className="save" onClick={createList}>Create</button></div><label>Emoji<input className="emojiInput" value={listEmoji} onChange={e=>setListEmoji(e.target.value)}/></label><label>Name<input autoFocus value={listName} onChange={e=>setListName(e.target.value)} placeholder="Ex.: VIAGEM"/></label></div></div>}</main>
 }
 createRoot(document.getElementById('root')!).render(<App/>);

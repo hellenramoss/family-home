@@ -29,14 +29,27 @@ function nextAfter(date,m){
  }
  return'';
 }
-function reconcile(initial=false){
- const lists=get(LISTS,[]),h=house(lists);if(!h)return false;
- const meta=get(META,{}),today=localDate();let changed=false;
- h.items.forEach(item=>{const m=meta[norm(item.name)]||{};if(!item.done||!isRecurring(m))return;let next=m.nextDueDate;if(!next&&m.lastCompletedOn)next=nextAfter(m.lastCompletedOn,m);if(next&&next<=today){item.done=false;m.nextDueDate=next;m.reopenedOn=today;meta[norm(item.name)]=m;changed=true}});
- if(changed){put(META,meta);put(LISTS,lists);if(!initial&&document.readyState!=='loading')setTimeout(()=>location.reload(),40)}
- return changed;
+function reconcile(){
+ const meta=get(META,{}),today=localDate();
+ const detail={saved:false,apply(lists){
+  const list=house(lists);
+  if(!list)return lists;
+  let changed=false;
+  const items=list.items.map(item=>{
+   const key=norm(item.name), task=meta[key];
+   if(!item.done||!isRecurring(task))return item;
+   const next=task.nextDueDate||(task.lastCompletedOn&&nextAfter(task.lastCompletedOn,task));
+   if(!next||next>today||task.reopenedOn===today)return item;
+   meta[key]={...task,nextDueDate:next,reopenedOn:today};
+   changed=true;
+   return {...item,done:false};
+  });
+  return changed?lists.map(current=>current.id===list.id?{...current,items}:current):lists;
+ }};
+ window.dispatchEvent(new CustomEvent('family-home-list-edit',{detail}));
+ if(detail.saved)put(META,meta);
+ return detail.saved;
 }
-reconcile(true);
 function markCompletion(task,done){
  const meta=get(META,{}),k=norm(task),m=meta[k]||{};
  if(!isRecurring(m))return;
@@ -62,7 +75,7 @@ function openReminder(task){
  o.querySelector('#fhReminderMinutes').value=String(m.reminderMinutes??15);
  const sync=()=>o.querySelector('#fhReminderOffsetLabel').style.display=o.querySelector('#fhReminderEnabled').checked?'grid':'none';sync();o.querySelector('#fhReminderEnabled').onchange=sync;
  o.querySelector('[data-x]').onclick=()=>o.remove();o.onclick=e=>{if(e.target===o)o.remove()};
- o.querySelector('[data-s]').onclick=async()=>{const dueDate=o.querySelector('#fhDueDate').value,dueTime=o.querySelector('#fhDueTime').value,enabled=o.querySelector('#fhReminderEnabled').checked,mins=Number(o.querySelector('#fhReminderMinutes').value);m.dueDate=dueDate||undefined;m.dueTime=dueTime||undefined;m.reminderEnabled=!!(enabled&&dueDate&&dueTime);m.reminderMinutes=mins;m.lastNotifiedOccurrence=undefined;meta[k]=m;put(META,meta);if(m.reminderEnabled&&'Notification'in window&&Notification.permission==='default'){try{await Notification.requestPermission()}catch{}}o.remove();enhanceRows();checkReminders()};
+ o.querySelector('[data-s]').onclick=async()=>{const dueDate=o.querySelector('#fhDueDate').value,dueTime=o.querySelector('#fhDueTime').value,enabled=o.querySelector('#fhReminderEnabled').checked,mins=Number(o.querySelector('#fhReminderMinutes').value);m.dueDate=dueDate||undefined;m.dueTime=dueTime||undefined;m.reminderEnabled=!!(enabled&&dueDate&&dueTime);m.reminderMinutes=mins;m.lastNotifiedOccurrence=undefined;meta[k]=m;put(META,meta);if(m.reminderEnabled&&'Notification'in window&&Notification.permission==='default'){try{await Notification.requestPermission()}catch{}}o.remove();enhanceRows();reconcile();checkReminders()};
  document.body.append(o)
 }
 function occurrenceForToday(m,today){
@@ -88,5 +101,5 @@ document.addEventListener('click',e=>{
  const b=e.target.closest?.('.menu button');if(b){const t=norm(b.textContent);if(t.includes('concluir todos'))processBulk('complete');if(t.includes('desmarcar todos'))processBulk('reset')}
 },true);
 let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;requestAnimationFrame(()=>{pending=false;enhanceRows()})});obs.observe(document.body,{childList:true,subtree:true});
-window.addEventListener('focus',()=>{if(!reconcile(false))checkReminders()});document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(!reconcile(false))checkReminders()}});setInterval(()=>{if(!reconcile(false))checkReminders()},30000);setTimeout(()=>{enhanceRows();checkReminders()},500);
+window.addEventListener('focus',()=>{reconcile();checkReminders()});document.addEventListener('visibilitychange',()=>{if(!document.hidden){reconcile();checkReminders()}});setInterval(()=>{reconcile();checkReminders()},30000);setTimeout(()=>{enhanceRows();reconcile();checkReminders()},500);
 })();

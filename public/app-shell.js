@@ -8,7 +8,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const localDate=(d=new Date())=>{const x=new Date(d.getTime()-d.getTimezoneOffset()*60000);return x.toISOString().slice(0,10)};
 // Planejamento solicitado para a semana de 26/10/2026; mantém refeições existentes.
 const mealSeedKey='fh-meals-plan-2026-10-26-28-v1';
-if(!localStorage.getItem(mealSeedKey)){
+try{if(!localStorage.getItem(mealSeedKey)){
  const meals=get(K.meals,[]);
  const planned=[
   {date:'2026-10-26',type:'Almoço',title:'Bife de contrafilé acebolado com arroz, brócolis refogado e batata dourada'},
@@ -16,13 +16,29 @@ if(!localStorage.getItem(mealSeedKey)){
  ];
  for(const meal of planned){if(!meals.some(x=>x.date===meal.date&&x.type===meal.type))meals.push({id:uid(),...meal});}
  put(K.meals,meals);localStorage.setItem(mealSeedKey,'1');
-}
+}}catch{}
 const money=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const parseMoney=v=>Number(String(v||'0').replace(/\./g,'').replace(',','.'))||0;
 const dayNames=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const dayLong=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 const shell=document.createElement('div');shell.id='fhShell';document.body.append(shell);
-let route='home';
+const routeKeys={home:'home',lists:'lists','Calendário':'calendar','Dias especiais':'special','Refeições':'meals','Horários':'timetable','Orçamento':'budget'};
+function remember(route){
+ try{localStorage.setItem('fh-shell-route',route)}catch{}
+ try{if(location.hash!=='#fh='+route)history.replaceState(history.state,'','#fh='+route)}catch{}
+}
+function startupRoute(){
+ const known=new Set(Object.values(routeKeys));
+ const hash=location.hash.startsWith('#fh=')?location.hash.slice(4):'';
+ if(known.has(hash))return hash;
+ try{
+  const saved=localStorage.getItem('fh-shell-route');
+  if(known.has(saved))return saved;
+  if(Object.prototype.hasOwnProperty.call(routeKeys,saved))return routeKeys[saved];
+  if(localStorage.getItem('fh-active-list-id'))return 'lists';
+ }catch{}
+ return 'home';
+}
 const svgHome='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-5v6h-5A1.5 1.5 0 0 1 3 19.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
 const svgPlus='<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 const header=title=>`<header class="fhModuleHeader"><button class="fhHome" aria-label="Início">${svgHome}</button><h1>${esc(title)}</h1><span></span></header>`;
@@ -30,9 +46,9 @@ const empty=text=>`<div class="fhEmpty">${esc(text)}</div>`;
 function stats(){const lists=get('family-home-lists',[]),events=get(K.cal,[]),special=get(K.special,[]),meals=get(K.meals,[]),time=get(K.time,[]),b=get(K.budget,null),today=localDate();const todayEvents=events.filter(x=>x.date===today).length;let next='Nenhuma data cadastrada';if(special.length){const now=new Date(today+'T12:00:00');const ds=special.map(x=>{let d=new Date(x.date+'T12:00:00');if(x.annual){d=new Date(now.getFullYear(),d.getMonth(),d.getDate(),12);if(d<now)d.setFullYear(d.getFullYear()+1)}return Math.ceil((d-now)/86400000)}).filter(x=>x>=0).sort((a,b)=>a-b);if(ds.length)next=ds[0]===0?'É hoje!':`Próxima em ${ds[0]} dias`}
 let budget='Comece seu orçamento';if(b?.categories?.length){const lim=b.categories.reduce((s,x)=>s+Number(x.limit||0),0),spent=(b.transactions||[]).filter(x=>String(x.date||'').slice(0,7)===localDate().slice(0,7)).reduce((s,x)=>s+Number(x.amount||0),0);budget=`${money(Math.max(0,lim-spent))} disponíveis`}
 return{lists:lists.length,todayEvents,next,meals:meals.length,time:time.length,budget}}
-function showHome(){route='home';try{localStorage.setItem('fh-shell-route','home')}catch{}shell.style.display='block';const s=stats();shell.innerHTML=`<main class="fhPage fhHomePage"><section class="fhFamilyTop"><div><h1>Ramos</h1><p>Nosso Family Home</p></div><div class="fhAvatar">He</div></section><section class="fhHero"><small>FAMÍLIA</small><strong>Nossa casa, tudo em um só lugar.</strong><span>Organize a rotina, as compras e os planos da família.</span></section><section class="fhGrid" id="fhModules"><button data-route="lists"><div><strong>Listas</strong><small>${s.lists} listas</small></div><b>📋</b></button><button data-route="calendar"><div><strong>Calendário</strong><small>${s.todayEvents?`${s.todayEvents} evento${s.todayEvents>1?'s':''} hoje`:'Nada hoje'}</small></div><b>📅</b></button><button data-route="special"><div><strong>Dias especiais</strong><small>${s.next}</small></div><b>🎉</b></button><button data-route="meals"><div><strong>Refeições</strong><small>${s.meals?'Planejamento salvo':'Planeje a semana'}</small></div><b>🍽️</b></button><button data-route="timetable"><div><strong>Horários</strong><small>${s.time?`${s.time} rotinas cadastradas`:'Organize os horários'}</small></div><b>🗓️</b></button><button data-route="budget"><div><strong>Orçamento</strong><small>${s.budget}</small></div><b>💰</b></button></section><div class="fhDock"><button class="active" data-route="home">${svgHome}<span>Início</span></button><button data-scroll="modules"><span class="fhFour">⌘</span><span>Módulos</span></button></div></main>`;wireShell()}
-function showLists(){route='lists';try{localStorage.setItem('fh-shell-route','lists')}catch{}shell.style.display='none';setTimeout(enhanceReact,0)}
-function modulePage(title,body,action){route=title;try{localStorage.setItem('fh-shell-route',title)}catch{}shell.style.display='block';shell.innerHTML=`<main class="fhPage">${header(title)}<div class="fhModuleBody">${body}</div>${action?`<button class="fhFab" data-action="${action}" aria-label="Adicionar">${svgPlus}</button>`:''}</main>`;wireShell()}
+function showHome(){remember('home');shell.style.display='block';const s=stats();shell.innerHTML=`<main class="fhPage fhHomePage"><section class="fhFamilyTop"><div><h1>Ramos</h1><p>Nosso Family Home</p></div><div class="fhAvatar">He</div></section><section class="fhHero"><small>FAMÍLIA</small><strong>Nossa casa, tudo em um só lugar.</strong><span>Organize a rotina, as compras e os planos da família.</span></section><section class="fhGrid" id="fhModules"><button data-route="lists"><div><strong>Listas</strong><small>${s.lists} listas</small></div><b>📋</b></button><button data-route="calendar"><div><strong>Calendário</strong><small>${s.todayEvents?`${s.todayEvents} evento${s.todayEvents>1?'s':''} hoje`:'Nada hoje'}</small></div><b>📅</b></button><button data-route="special"><div><strong>Dias especiais</strong><small>${s.next}</small></div><b>🎉</b></button><button data-route="meals"><div><strong>Refeições</strong><small>${s.meals?'Planejamento salvo':'Planeje a semana'}</small></div><b>🍽️</b></button><button data-route="timetable"><div><strong>Horários</strong><small>${s.time?`${s.time} rotinas cadastradas`:'Organize os horários'}</small></div><b>🗓️</b></button><button data-route="budget"><div><strong>Orçamento</strong><small>${s.budget}</small></div><b>💰</b></button></section><div class="fhDock"><button class="active" data-route="home">${svgHome}<span>Início</span></button><button data-scroll="modules"><span class="fhFour">⌘</span><span>Módulos</span></button></div></main>`;wireShell()}
+function showLists(){remember('lists');shell.style.display='none';setTimeout(enhanceReact,0)}
+function modulePage(title,body,action){remember(routeKeys[title]);shell.style.display='block';shell.innerHTML=`<main class="fhPage">${header(title)}<div class="fhModuleBody">${body}</div>${action?`<button class="fhFab" data-action="${action}" aria-label="Adicionar">${svgPlus}</button>`:''}</main>`;wireShell()}
 function startOfWeek(){const d=new Date(),diff=(d.getDay()+6)%7;d.setDate(d.getDate()-diff);d.setHours(12,0,0,0);return d}
 function showCalendar(){const events=get(K.cal,[]),meals=get(K.meals,[]),times=get(K.time,[]),special=get(K.special,[]),start=startOfWeek();let html='<section class="fhWeek">';for(let i=0;i<7;i++){const d=new Date(start);d.setDate(start.getDate()+i);const key=localDate(d),today=key===localDate();html+=`<button class="${today?'today':''}"><small>${dayNames[d.getDay()]}</small><b>${d.getDate()}</b></button>`}html+='</section><section class="fhAgenda">';for(let i=0;i<7;i++){const d=new Date(start);d.setDate(start.getDate()+i);const key=localDate(d),dow=d.getDay(),items=[];events.filter(x=>x.date===key).forEach(x=>items.push({time:x.time||'',icon:'📌',title:x.title,kind:'Evento'}));meals.filter(x=>x.date===key).forEach(x=>items.push({time:'',icon:'🍽️',title:x.title,kind:x.type}));times.filter(x=>(x.days||[]).includes(dow)).forEach(x=>items.push({time:x.time||'',icon:'🗓️',title:x.title,kind:x.person||'Rotina'}));special.forEach(x=>{const sd=new Date(x.date+'T12:00:00');if((x.annual&&sd.getMonth()===d.getMonth()&&sd.getDate()===d.getDate())||(!x.annual&&x.date===key))items.push({time:'',icon:x.emoji||'🎉',title:x.title,kind:'Dia especial'})});items.sort((a,b)=>a.time.localeCompare(b.time));html+=`<div class="fhDay"><div class="fhDayTitle"><strong>${i===0?'Segunda':dayLong[dow]} ${d.getDate()}/${d.getMonth()+1}</strong><button data-add-event="${key}">+</button></div>${items.length?items.map(x=>`<div class="fhAgendaItem"><time>${esc(x.time)}</time><span>${x.icon}</span><div><strong>${esc(x.title)}</strong><small>${esc(x.kind)}</small></div></div>`).join(''):empty('Nada planejado')}</div>`}html+='</section>';modulePage('Calendário',html,'event');document.querySelectorAll('[data-add-event]').forEach(b=>b.addEventListener('click',()=>eventForm(b.dataset.addEvent)))}
 function eventForm(date=localDate()){openForm('Novo evento',`<label>Título<input name="title" required placeholder="Ex.: Consulta"></label><div class="fhFormGrid"><label>Data<input name="date" type="date" value="${date}"></label><label>Horário<input name="time" type="time"></label></div>`,f=>{const a=get(K.cal,[]);a.push({id:uid(),title:f.title.value.trim(),date:f.date.value,time:f.time.value});put(K.cal,a);showCalendar()})}
@@ -53,5 +69,5 @@ function wireShell(){shell.querySelectorAll('[data-route]').forEach(b=>b.onclick
 function navigate(r){({home:showHome,lists:showLists,calendar:showCalendar,special:showSpecial,meals:showMeals,timetable:showTimetable,budget:showBudget}[r]||showHome)()}
 function enhanceReact(){document.querySelectorAll('.homeHeader,.listHeader').forEach(h=>{if(h.querySelector('.fhHomeBridge'))return;const b=document.createElement('button');b.className='fhHomeBridge';b.innerHTML=svgHome;b.title='Início';b.onclick=e=>{e.preventDefault();e.stopPropagation();showHome()};h.append(b)});const hh=document.querySelector('.homeHeader h1');if(hh&&hh.textContent.trim()==='Lists')hh.textContent='Listas';document.querySelectorAll('.listText small').forEach(x=>x.textContent='♧ Compartilhado com a família');document.querySelectorAll('.nativeRow').forEach(r=>{if(r.textContent.includes('TAREFAS DA CASA')){const i=r.querySelector('.lineIcon');if(i)i.textContent='🏠'}});document.querySelectorAll('.sheetTitle h2').forEach(x=>{if(x.textContent==='New list')x.textContent='Nova lista'});document.querySelectorAll('.sheetTitle .save').forEach(x=>{if(x.textContent==='Create')x.textContent='Criar'});document.querySelectorAll('.sheet>label').forEach(l=>{const text=l.childNodes[0]?.textContent?.trim();if(text==='Name')l.childNodes[0].textContent='Nome';if(text==='Emoji')l.childNodes[0].textContent='Emoji'})}
 const obs=new MutationObserver(()=>{if(shell.style.display==='none')enhanceReact()});obs.observe(document.getElementById('root'),{childList:true,subtree:true});
-try{const last=localStorage.getItem('fh-shell-route');if(last==='lists'){showLists()}else{showHome()}}catch{showHome()}
+navigate(startupRoute());
 })();

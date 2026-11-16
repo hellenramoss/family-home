@@ -31,6 +31,8 @@ jobs:
           for file in public/*.js; do
             node --check "$file"
           done
+      - name: Test list sync and PWA
+        run: npm test
       - name: Build
         run: npm run build
       - name: Setup Pages

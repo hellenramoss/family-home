@@ -70,7 +70,7 @@
   }
   async function extract(file) {
     const pdfjs = await pdfLibrary();
-    const pdf = await pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+    const pdf = await pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise;
     const pages = [];
     for(let p=1;p<=pdf.numPages;p++){
       const page=await pdf.getPage(p);
@@ -179,7 +179,9 @@
                 unitPrice:currency(g.unitPrice),purchasedAt:receipt.purchasedAt,receiptKey:receipt.receiptKey,
                 source:`NFC-e ${receipt.receiptKey}`,receiptLines:g.lines};
             });
-            window.dispatchEvent(new CustomEvent('family-home-receipt-import',{detail:{receiptKey:receipt.receiptKey,entries}}));
+            const detail={receiptKey:receipt.receiptKey,entries,saved:false};
+            window.dispatchEvent(new CustomEvent('family-home-receipt-import',{detail}));
+            if(!detail.saved)throw Error('Não foi possível guardar a nota neste aparelho. Tente novamente quando a lista estiver disponível.');
             close();
           }catch(error){sheet.querySelector('.receiptStatus').textContent=error.message;}
         };

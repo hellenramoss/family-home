@@ -36,31 +36,19 @@ function text(change,actor){
   default:return null;
  }
 }
-async function install(){
- const cloud=window.familyHomeCloud,sb=window.familyHomeSupabase;
- if(!cloud||!sb||cloud.__pushEventsInstalled)return false;
- cloud.__pushEventsInstalled=true;
- let last=null;
- try{const remote=await cloud.loadLists?.();if(Array.isArray(remote))last=clone(remote)}catch{}
- const original=cloud.saveLists.bind(cloud);
- cloud.saveLists=async payload=>{
-  const before=last?clone(last):null;
-  const ok=await original(payload);
-  if(!ok)return ok;
-  last=clone(payload);
-  const c=activity(before,payload);
-  if(!c)return ok;
-  const actor=cloud.currentMembership?.display_name||'Alguém';
-  const body=text(c,actor);if(!body)return ok;
-  try{
-   const {error}=await sb.functions.invoke('push-test',{body:{title:'Family Home 🏠',body,tag:`family-home-${c.kind}-${c.list?.id||'list'}`,url:'/family-home/'}});
-   if(error)console.warn('Family Home push:',error);
-  }catch(e){console.warn('Family Home push:',e)}
-  return ok;
- };
- window.addEventListener('family-home-cloud-data',e=>{const p=e.detail?.payload;if(Array.isArray(p))last=clone(p)});
- return true;
-}
-let tries=0;const timer=setInterval(async()=>{tries++;if(await install()||tries>40)clearInterval(timer)},250);
-window.addEventListener('family-home-family-ready',()=>{void install()});
+const cloud=window.familyHomeCloud,sb=window.familyHomeSupabase;
+if(!cloud||!sb)return;
+const save=cloud.saveLists.bind(cloud);
+cloud.saveLists=async (before,after)=>{
+ const result=await save(before,after);
+ const change=activity(before,after);
+ if(!change)return result;
+ const body=text(change,cloud.currentMembership?.display_name);
+ if(body){
+  void sb.functions.invoke('push-test',{body:{title:'Family Home 🏠',body,tag:`family-home-${change.kind}-${change.list?.id||'list'}`,url:'/family-home/'}})
+   .then(({error})=>{if(error)console.warn('Family Home: notificação indisponível.')})
+   .catch(()=>console.warn('Family Home: notificação indisponível.'));
+ }
+ return result;
+};
 })();
