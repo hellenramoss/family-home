@@ -41,8 +41,7 @@ const normalizeLists=(lists:FamilyList[])=>lists.map(list=>{
 });
 function SyncMessage({status}:{status:string}){
  const messages:Record<string,string>={
-  waiting:'Conectando à família…',pending:'Alterações pendentes neste aparelho.',
-  syncing:'Sincronizando alterações…',offline:'Sem conexão. As alterações serão enviadas ao reconectar.',
+  offline:'Sem conexão. As alterações serão enviadas ao reconectar.',
   error:'Sincronização indisponível. As alterações pendentes ficam neste aparelho.',
   conflict:'A família alterou os mesmos dados. As suas alterações pendentes estão guardadas neste aparelho.',
   storage:'Armazenamento indisponível. Mantenha o app aberto e tente sincronizar.'
