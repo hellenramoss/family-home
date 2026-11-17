@@ -10,6 +10,8 @@ Family Home é uma PWA familiar em português do Brasil. Em tarefas de manutenç
 - `supabase/schema.sql` descreve parte do backend. Para mudanças em tabelas, políticas ou RPCs ausentes, obtenha a definição autorizada antes de assumir nomes, permissões, constraints ou cascatas.
 - Preserve alterações locais já existentes. Limite as edições ao escopo e mantenha os documentos consistentes quando o comportamento descrito mudar.
 
+- A cada atualização publicada, incremente a versão visível em `public/app-version-v1.js` e atualize os identificadores de cache correspondentes em `index.html` e `public/sw.js`, para que seja possível confirmar a versão instalada.
+
 ## Desenvolvimento e validação
 
 - Consulte scripts em `package.json`. Use `npm run dev` quando as dependências estiverem presentes. Antes de navegar na versão local, isole o backend e use fixtures sintéticas ou um projeto de teste autorizado, pois o config público aponta para o backend compartilhado.
