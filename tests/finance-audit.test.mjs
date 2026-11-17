@@ -75,3 +75,11 @@ test('personal card details appear in the individual view without payment or tra
  assert.match(target.innerHTML,/Compra pessoal incluída na fatura familiar/);
  assert.doesNotMatch(target.innerHTML,/data-pay|data-edit/);
 });
+test('pets purchases reduce the forecast instead of adding it again',()=>{
+ const body={innerHTML:'',querySelectorAll:()=>[]},target={innerHTML:'',querySelectorAll:()=>[]};
+ const panel={querySelector:s=>s==='.fdBody'?body:target,querySelectorAll:()=>[]};
+ const window={addEventListener(){}};const document={documentElement:{},querySelector:s=>s==='.financeDashboard'?panel:null};
+ const code=read('finance-dashboard.js').replace('window.addEventListener',"window.test={set:()=>{rows=[{id:'p',title:'Pets',category:'Pets',direction:'expense',status:'planned',amount:400,competence:'2026-11-01'}];petsSpent=30;marketSpent=0;marketItems=[];tab='transactions';scope='family'},render};window.addEventListener");
+ vm.runInNewContext(code,{window,document,MutationObserver:class{observe(){}},requestAnimationFrame(){}});window.test.set();window.test.render();
+ assert.match(body.innerHTML,/400,00/);assert.doesNotMatch(body.innerHTML,/430,00/);assert.match(target.innerHTML,/Gasto previsto/);assert.doesNotMatch(target.innerHTML,/data-pay/);
+});

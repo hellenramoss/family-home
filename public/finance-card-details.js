@@ -26,12 +26,13 @@ const select=content.querySelector('[data-statement]');
 select.value=selected;select.onchange=()=>{selected=select.value;render()};
 const area=content.querySelector('.financeCardRows');
 if(!invoice){area.textContent='Nenhuma fatura encontrada neste mês.';return}
-const lines=await sb.from('finance_card_lines').select('id,title,amount,installment_label,source_row').eq('statement_transaction_id',invoice.id).order('source_row');
+const lines=await sb.from('finance_card_lines').select('id,title,amount,installment_label,source_row,purchase_paid').eq('statement_transaction_id',invoice.id).order('source_row');
 if(lines.error){area.textContent=lines.error.message;return}
 const hasValues=(lines.data||[]).some(x=>x.amount!==null);
 const total=(lines.data||[]).reduce((s,x)=>s+(x.amount===null?0:Number(x.amount)),0);
 area.innerHTML='<p>Total atual: <strong>'+money(invoice.amount)+'</strong> · Soma das linhas: <strong>'+money(total)+'</strong>'+(Math.abs(Number(invoice.statement_adjustment||0))>=0.005?' · Ajustes: <strong>'+money(invoice.statement_adjustment)+'</strong>':'')+'</p>'+
-(lines.data||[]).map(x=>'<div class="financeCardRow"><div><b>'+escapeHtml(x.title)+'</b><small>'+escapeHtml(x.installment_label||'Sem parcela')+' · linha '+x.source_row+'</small></div><span>'+(x.amount===null?'Sem valor':money(x.amount))+'</span><button data-edit="'+escapeHtml(x.id)+'">Editar</button></div>').join('');
+(lines.data||[]).map(x=>'<div class="financeCardRow"><div><b>'+escapeHtml(x.title)+'</b><small>'+escapeHtml(x.installment_label||'Sem parcela')+' · linha '+x.source_row+'</small></div><span>'+(x.amount===null?'Sem valor':money(x.amount))+'</span><label>Pago <input type="checkbox" data-paid="'+escapeHtml(x.id)+'" '+(x.purchase_paid===true?'checked':'')+'></label><button data-edit="'+escapeHtml(x.id)+'">Editar</button></div>').join('');
+area.querySelectorAll('[data-paid]').forEach(box=>box.onchange=async()=>{box.disabled=true;const result=await sb.from('finance_card_lines').update({purchase_paid:box.checked}).eq('id',box.dataset.paid).eq('family_id',profile.data.family_id).select('id').maybeSingle();if(result.error||!result.data){box.checked=!box.checked;alert(result.error?.message||'Não foi possível atualizar o pagamento.')}box.disabled=false});
 area.querySelectorAll('[data-edit]').forEach(button=>button.onclick=()=>{
 const item=lines.data.find(x=>x.id===button.dataset.edit);
 const editor=document.createElement('form');editor.className='financeCardEdit';

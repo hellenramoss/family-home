@@ -1,4 +1,4 @@
-const CACHE='family-home-v30';
+const CACHE='family-home-v31';
 const APP='/family-home/';
 const SDK='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js';
 
