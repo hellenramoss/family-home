@@ -64,3 +64,14 @@ test('a historical expense with unknown payment is presented without claiming it
  assert.doesNotMatch(target.innerHTML,/Não pago/);
  assert.match(target.innerHTML,/Marcar pago/);
 });
+test('personal card details appear in the individual view without payment or transaction editing actions',()=>{
+ const body={innerHTML:'',querySelectorAll:()=>[]},target={innerHTML:'',querySelectorAll:()=>[]};
+ const panel={querySelector:selector=>selector==='.fdBody'?body:target,querySelectorAll:()=>[]};
+ const window={addEventListener(){}};
+ const document={documentElement:{},querySelector:selector=>selector==='.financeDashboard'?panel:null};
+ const code=read('finance-dashboard.js').replace('window.addEventListener',"window.test={set:()=>{rows=[{id:'card-line',title:'Compra',category:'Cartões',direction:'expense',status:'posted',payment_status:'unknown',amount:50,competence:'2026-11-01',cardDetail:true}];tab='transactions';scope='person'},render};window.addEventListener");
+ vm.runInNewContext(code,{window,document,MutationObserver:class{observe(){}},requestAnimationFrame(){}});
+ window.test.set();window.test.render();
+ assert.match(target.innerHTML,/Compra pessoal incluída na fatura familiar/);
+ assert.doesNotMatch(target.innerHTML,/data-pay|data-edit/);
+});

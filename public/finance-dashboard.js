@@ -21,8 +21,15 @@ const picker=panel.querySelector('.fdScope');picker.innerHTML=options.map(x=>'<o
 const next=new Date(month+'-01T12:00:00');next.setMonth(next.getMonth()+1);
 let q=sb.from('finance_transactions').select('id,title,amount,direction,status,category,competence,due_date,payment_status,paid_on').eq('family_id',familyId).gte('competence',month+'-01').lt('competence',next.toLocaleDateString('sv-SE'));q=scope==='family'?q.is('owner_id',null):q.eq('owner_id',scope);
 const [tx,cc]=await Promise.all([q,sb.from('finance_categories').select('id,name,monthly_limit').eq('family_id',familyId).order('name')]);
-if(tx.error)throw tx.error;if(cc.error&&scope==='family')throw cc.error;if(token!==seq||!panel.isConnected)return;
-rows=tx.data||[];cats=cc.data||[];syncMarket();render();
+if(tx.error)throw tx.error;if(cc.error&&scope==='family')throw cc.error;
+let cardDetails=[];
+if(scope!=='family'){
+const personName=(people.data||[]).find(x=>x.user_id===scope)?.name?.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()||'';
+const person=/\bhellen\b/.test(personName)?'hellen':/\bkarina\b/.test(personName)?'karina':null;
+if(person){const detail=await sb.from('finance_nubank_personal_import').select('id,description,amount,installment,month').eq('family_id',familyId).eq('person',person).eq('month',month+'-01');if(detail.error)throw detail.error;cardDetails=(detail.data||[]).map(x=>({id:x.id,title:x.description,amount:x.amount,direction:'expense',status:'posted',category:'Cartões',competence:x.month,payment_status:'unknown',cardDetail:true,installment:x.installment}));}
+}
+if(token!==seq||!panel.isConnected)return;
+rows=[...(tx.data||[]),...cardDetails];cats=cc.data||[];syncMarket();render();
 }catch(e){if(token===seq)panel.querySelector('.fdBody').textContent=e.message||'Erro ao carregar'}
 }
 function syncMarket(){
@@ -78,7 +85,7 @@ if(tab==='transactions'){
 const shown=rows.filter(x=>x.status!=='cancelled'&&(!category||x.category===category)&&(!direction||x.direction===direction)).sort((a,b)=>String(b.competence).localeCompare(String(a.competence)));
 const petRows=scope==='family'&&(!direction||direction==='expense')&&(!category||category==='Pets')?marketItems.filter(x=>x.petAmount>0).map(x=>'<div class="fdLine"><span><strong>Itens de pets · '+esc(x.description||'Compra de mercado')+'</strong><small>'+esc(x.date)+' · Pets · Compra no histórico local</small></span><b>-'+money(x.petAmount)+'</b></div>').join(''):'';
 const marketRows=scope==='family'&&(!direction||direction==='expense')&&(!category||category==='Mercado')?marketItems.filter(x=>x.marketAmount>0).map(x=>'<div class="fdLine"><span><strong>'+esc(x.description||'Compra de mercado')+'</strong><small>'+esc(x.date)+' · Mercado · Compra registrada</small></span><b>-'+money(x.marketAmount)+'</b></div>').join(''):'';
-target.innerHTML='<h3>'+esc(category||'Lançamentos do mês')+'</h3>'+petRows+marketRows+(shown.length?shown.map(x=>'<div class="fdLine"><span><strong>'+esc(x.title)+'</strong><small>'+esc(x.competence)+' · '+esc(x.category||(x.direction==='income'?'Entrada':'Outras despesas'))+' · '+(x.direction==='expense'?(x.payment_status==='paid'?'Pago':x.payment_status==='unknown'?'Pagamento não informado':'Não pago'):'Entrada')+'</small></span>'+(x.direction==='expense'?'<button type="button" class="fdPay" data-pay="'+esc(x.id)+'">'+(x.payment_status==='paid'?'Desfazer pagamento':'Marcar pago')+'</button>':'')+'<b>'+(x.direction==='expense'?'-':'+')+money(x.amount)+'</b><button type="button" class="fdEdit" data-edit="'+esc(x.id)+'">Editar</button></div>').join(''):petRows||marketRows?'':'<p class="fdEmpty">Nenhum lançamento nesta seleção.</p>');
+target.innerHTML='<h3>'+esc(category||'Lançamentos do mês')+'</h3>'+petRows+marketRows+(shown.length?shown.map(x=>'<div class="fdLine"><span><strong>'+esc(x.title)+'</strong><small>'+esc(x.competence)+' · '+esc(x.category||(x.direction==='income'?'Entrada':'Outras despesas'))+' · '+(x.cardDetail?'Compra pessoal incluída na fatura familiar':x.direction==='expense'?(x.payment_status==='paid'?'Pago':x.payment_status==='unknown'?'Pagamento não informado':'Não pago'):'Entrada')+'</small></span>'+(x.direction==='expense'&&!x.cardDetail?'<button type="button" class="fdPay" data-pay="'+esc(x.id)+'">'+(x.payment_status==='paid'?'Desfazer pagamento':'Marcar pago')+'</button>':'')+'<b>'+(x.direction==='expense'?'-':'+')+money(x.amount)+'</b>'+(x.cardDetail?'':'<button type="button" class="fdEdit" data-edit="'+esc(x.id)+'">Editar</button>')+'</div>').join(''):petRows||marketRows?'':'<p class="fdEmpty">Nenhum lançamento nesta seleção.</p>');
 target.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editEntry(b.dataset.edit));
 target.querySelectorAll('[data-pay]').forEach(b=>b.onclick=async()=>{const tx=rows.find(x=>x.id===b.dataset.pay);if(!tx)return;const done=tx.payment_status==='paid';if(!done&&!confirm('Confirmar pagamento de '+tx.title+'?'))return;const response=await window.familyHomeSupabase.rpc('finance_set_payment',{tid:tx.id,is_paid:!done,actual_date:null});if(response.error){alert(response.error.message);return}await load()});
 return;
