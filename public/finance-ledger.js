@@ -57,6 +57,7 @@ async function render(){
  await render();
 }catch(error){header();const p=document.createElement('p');p.className='error';p.textContent=error.message||'Falha ao abrir finanças.';sheet.append(p)}
 }
+window.openFamilyFinanceLedger=open;
 function attach(){const hero=document.querySelector('.fhBudgetHero');if(!hero||document.querySelector('[data-ledger]'))return;const b=document.createElement('button');b.className='financeLedgerButton';b.dataset.ledger='1';b.textContent='Abrir Finanças 2.0';b.onclick=open;hero.after(b)}
 new MutationObserver(attach).observe(document.documentElement,{childList:true,subtree:true});attach();
 })();

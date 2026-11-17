@@ -49,6 +49,7 @@
       }
     }catch(error){sheet.append(el('p',{className:'financeUserError',textContent:error.message||'Não foi possível carregar os usuários.'}))}
   }
+  window.openFamilyFinanceUsers=show;
   function enhance(){
     const page=document.querySelector('.fhBudgetHero');
     if(!page||document.querySelector('[data-finance-users]'))return;

@@ -12,7 +12,7 @@ const profile=await sb.from('finance_users').select('family_id,role').eq('user_i
 if(profile.error||!profile.data)throw Error('Perfil financeiro não encontrado.');
 const month=document.querySelector('.financeDashboard .fdMonth')?.value||new Date().toLocaleDateString('sv-SE').slice(0,7);
 const scope=document.querySelector('.financeDashboard .fdScope')?.value||user.id;
-let query=sb.from('finance_transactions').select('id,title,amount').eq('family_id',profile.data.family_id).eq('competence',month+'-01').like('title','Cartão %');
+let query=sb.from('finance_transactions').select('*').eq('family_id',profile.data.family_id).eq('competence',month+'-01').like('title','Cartão %');
 query=scope==='family'?query.is('owner_id',null):query.eq('owner_id',scope);
 const invoices=await query;if(invoices.error)throw invoices.error;
 const content=shade.querySelector('.financeCardSheet');
@@ -30,7 +30,7 @@ const lines=await sb.from('finance_card_lines').select('id,title,amount,installm
 if(lines.error){area.textContent=lines.error.message;return}
 const hasValues=(lines.data||[]).some(x=>x.amount!==null);
 const total=(lines.data||[]).reduce((s,x)=>s+(x.amount===null?0:Number(x.amount)),0);
-area.innerHTML='<p>Total atual: <strong>'+money(invoice.amount)+'</strong> · Soma das linhas: <strong>'+money(total)+'</strong></p>'+
+area.innerHTML='<p>Total atual: <strong>'+money(invoice.amount)+'</strong> · Soma das linhas: <strong>'+money(total)+'</strong>'+(Math.abs(Number(invoice.statement_adjustment||0))>=0.005?' · Ajustes: <strong>'+money(invoice.statement_adjustment)+'</strong>':'')+'</p>'+
 (lines.data||[]).map(x=>'<div class="financeCardRow"><div><b>'+escapeHtml(x.title)+'</b><small>'+escapeHtml(x.installment_label||'Sem parcela')+' · linha '+x.source_row+'</small></div><span>'+(x.amount===null?'Sem valor':money(x.amount))+'</span><button data-edit="'+escapeHtml(x.id)+'">Editar</button></div>').join('');
 area.querySelectorAll('[data-edit]').forEach(button=>button.onclick=()=>{
 const item=lines.data.find(x=>x.id===button.dataset.edit);
@@ -52,6 +52,7 @@ await render();window.dispatchEvent(new Event('finance-data-changed'));
 await render();
 }catch(err){shade.querySelector('.financeCardSheet').append(document.createTextNode(err.message||'Não foi possível abrir as faturas.'))}
 }
+window.openFamilyFinanceCards=open;
 function attach(){const el=document.querySelector('.financeDashboard .fdLinks');if(!el||el.querySelector('[data-invoices]'))return;
 const button=document.createElement('button');button.textContent='Faturas e parcelas';button.dataset.invoices='1';button.onclick=open;el.prepend(button)}
 new MutationObserver(attach).observe(document.documentElement,{childList:true,subtree:true});attach();

@@ -21,13 +21,24 @@ function finalizedGroups(){
 function sync(){
  const b=data();let cat=b.categories.find(c=>c.id==='market')||b.categories.find(c=>String(c.name||'').toLowerCase()==='mercado');
  if(!cat){cat={id:'market',name:'Mercado',emoji:'🛒',limit:0};b.categories.push(cat)}
- const groups=finalizedGroups();
+ const batches=get('fh-market-batches-v1',[]);
+ const covered=new Set(b.transactions.filter(t=>t.source==='market-batch').flatMap(t=>{
+   const batch=batches.find(item=>item.id===t.sourceBatchId);
+   return t.sourcePurchaseIds||batch?.recordIds||[];
+ }));
+ const groups=finalizedGroups().map(group=>{
+   const items=group.items.filter(item=>!covered.has(item.id));
+   return {...group,items,total:items.reduce((sum,item)=>sum+parseMoney(item.price),0)};
+ }).filter(group=>group.total>0);
  b.transactions=b.transactions.filter(t=>!(t.source==='market'||t.source==='market-group'||t.source==='market-shadow'));
  groups.forEach(g=>{
    const ids=g.items.map(x=>x.id);
    b.transactions.push({id:`market-group-${g.ts}`,categoryId:cat.id,amount:g.total,description:`Compra de mercado · ${g.items.length} ${g.items.length===1?'item':'itens'}`,date:g.ts.slice(0,10),source:'market-group',sourcePurchaseIds:ids,sourcePurchaseAt:g.ts});
    ids.forEach(id=>b.transactions.push({id:`market-shadow-${id}`,categoryId:cat.id,amount:0,description:'',date:g.ts.slice(0,10),source:'market-shadow',sourcePurchaseId:id,hidden:true}))
  });
+ // Shadow rows prevent the older per-item importer from creating the same
+ // purchase again, including purchases already represented by a saved batch.
+ covered.forEach(id=>b.transactions.push({id:`market-shadow-${id}`,categoryId:cat.id,amount:0,description:'',source:'market-shadow',sourcePurchaseId:id,hidden:true}));
  put(BK,b)
 }
 function modal(title,html,onSave){

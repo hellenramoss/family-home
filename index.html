@@ -51,14 +51,14 @@
     <script src="/family-home/sync-settings-bridge-v1.js?v=92" defer></script>
     <script src="/family-home/calendar-task-sync.js?v=92" defer></script>
     <script src="/family-home/currency-brl-v1.js?v=126" defer></script>
-    <script src="/family-home/budget-experience-v3.js?v=92" defer></script>
-    <script src="/family-home/finance-users.js?v=94" defer></script>
-    <script src="/family-home/finance-ledger.js?v=99" defer></script>
-    <script src="/family-home/finance-dashboard.js?v=106" defer></script>
+    <script src="/family-home/budget-experience-v3.js?v=127" defer></script>
+    <script src="/family-home/finance-users.js?v=127" defer></script>
+    <script src="/family-home/finance-ledger.js?v=127" defer></script>
+    <script src="/family-home/finance-dashboard.js?v=127" defer></script>
     <script src="/family-home/finance-split.js?v=100" defer></script>
-    <script src="/family-home/finance-card-details.js?v=99" defer></script>
-<script src="/family-home/finance-nubank-shared.js?v=117" defer></script>
-<script src="/family-home/finance-home-settings.js?v=100" defer></script>
+    <script src="/family-home/finance-card-details.js?v=127" defer></script>
+<script src="/family-home/finance-nubank-shared.js?v=127" defer></script>
+<script src="/family-home/finance-home-settings.js?v=127" defer></script>
     <script src="/family-home/calendar-experience-v2.js?v=92" defer></script>
 <script src="/family-home/calendar-school-import.js?v=109" defer></script>
 <script src="/family-home/calendar-connections.js?v=109" defer></script>
@@ -69,7 +69,7 @@
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', async () => {
           try {
-            const registration = await navigator.serviceWorker.register('/family-home/sw.js?v=126', { updateViaCache: 'none' });
+            const registration = await navigator.serviceWorker.register('/family-home/sw.js?v=127', { updateViaCache: 'none' });
             await registration.update();
           } catch {}
         });
